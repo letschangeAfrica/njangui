@@ -116,7 +116,7 @@ def search_providers(
     mobile_only: bool = Query(False, description="Only mobile providers"),
     delivery_only: bool = Query(False, description="Only providers with delivery"),
     page: int = Query(1, ge=1),
-    page_size: int = Query(20, ge=1, le=50),
+    page_size: int = Query(20, ge=1),
     db: Session = Depends(get_db),
 ):
     page_size = min(page_size, 50)  # hard cap even if validation is bypassed
