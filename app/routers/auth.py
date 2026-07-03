@@ -31,6 +31,23 @@ from app.services import auth_service
 router = APIRouter()
 
 
+# ── GET /auth/exists ──────────────────────────────────────────────────────────
+@router.get(
+    "/exists",
+    status_code=status.HTTP_200_OK,
+    summary="Check if a phone number is registered",
+    description=(
+        "Returns {exists: bool}. Used by the mobile app before the PIN screen "
+        "to decide whether to show 'create PIN' (new user) or 'enter PIN' (existing). "
+        "No authentication required — phone ownership is still proven by OTP."
+    ),
+)
+def check_exists(phone: str, db: Session = Depends(get_db)):
+    from app.models.user import User as UserModel
+    exists = db.query(UserModel).filter(UserModel.phone_number == phone).first() is not None
+    return {"exists": exists}
+
+
 # ── POST /auth/otp/request ────────────────────────────────────────────────────
 @router.post(
     "/otp/request",

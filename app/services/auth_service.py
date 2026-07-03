@@ -184,18 +184,17 @@ def register_user(data: RegisterIn, db: Session) -> TokenOut:
     Create a new user account.
 
     Flow:
-      1. Verify OTP (raises if invalid)
-      2. Check phone number not already registered
+      1. Check phone number not already registered  ← MUST be first so OTP is
+         not consumed before we know whether to proceed.
+      2. Verify OTP (raises if invalid)
       3. Create User with hashed PIN
       4. Return JWT token
 
     The user starts as role='customer'. They can register as a provider
     separately (which creates a ProviderProfile and updates role to 'provider' or 'both').
     """
-    # 1. Verify and consume OTP
-    _verify_and_consume_otp(data.phone_number, data.otp_code, db)
-
-    # 2. Check phone not already registered
+    # 1. Check phone not already registered — before touching the OTP so
+    #    the caller can reuse the same OTP code when switching to login mode.
     existing = db.query(User).filter(User.phone_number == data.phone_number).first()
     if existing:
         raise HTTPException(
@@ -205,6 +204,9 @@ def register_user(data: RegisterIn, db: Session) -> TokenOut:
                 "Utilisez 'Connexion' si vous avez déjà un compte."
             ),
         )
+
+    # 2. Verify and consume OTP (only reached for genuinely new accounts)
+    _verify_and_consume_otp(data.phone_number, data.otp_code, db)
 
     # 3. Create user
     user = User(
@@ -281,15 +283,17 @@ def login_user(data: LoginIn, db: Session) -> TokenOut:
             ),
         )
 
-    # 3. Verify and consume OTP
-    _verify_and_consume_otp(data.phone_number, data.otp_code, db)
-
-    # 4. Verify PIN
+    # 3. Verify PIN FIRST — before consuming the OTP.
+    #    This lets the user retry with the same OTP if they mistype their PIN,
+    #    instead of burning the OTP and leaving them locked out.
     if not verify_pin(data.pin, user.pin_hash):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="PIN incorrect.",
         )
+
+    # 4. Verify and consume OTP (only after PIN is confirmed correct)
+    _verify_and_consume_otp(data.phone_number, data.otp_code, db)
 
     # 5. Update last_login_at and reset lockout
     user.last_login_at    = now
