@@ -1,4 +1,4 @@
-﻿"""
+"""
 pytest fixtures shared across all test files.
 
 Architecture:
@@ -17,10 +17,10 @@ import pytest
 from alembic import command
 from alembic.config import Config
 from fastapi.testclient import TestClient
-from sqlalchemy import create_engine, text
+from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-from app.database import Base, get_db
+from app.database import get_db
 from app.main import app
 from app.core.security import hash_pin, hash_otp, create_access_token
 from app.models.user import User, UserRole
@@ -42,6 +42,7 @@ TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=test_
 # ═══════════════════════════════════════════════════════════════════════════════
 # Session-scoped: run Alembic migration ONCE for the whole test session
 # ═══════════════════════════════════════════════════════════════════════════════
+
 
 @pytest.fixture(scope="session", autouse=True)
 def apply_migrations():
@@ -66,6 +67,7 @@ def apply_migrations():
 # Function-scoped: isolated DB session per test (transaction rollback)
 # ═══════════════════════════════════════════════════════════════════════════════
 
+
 @pytest.fixture()
 def db():
     """
@@ -89,6 +91,7 @@ def client(db):
     FastAPI TestClient with the real DB dependency overridden to use the test session.
     Every request made through this client uses the same rolled-back transaction.
     """
+
     def override_get_db():
         yield db
 
@@ -102,10 +105,10 @@ def client(db):
 # Reusable data fixtures
 # ═══════════════════════════════════════════════════════════════════════════════
 
-PHONE_NUMBER  = "+237612345678"
+PHONE_NUMBER = "+237612345678"
 PHONE_NUMBER2 = "+237699887766"
-VALID_PIN     = "7391"
-VALID_OTP     = "847291"
+VALID_PIN = "7391"
+VALID_OTP = "847291"
 
 
 @pytest.fixture()

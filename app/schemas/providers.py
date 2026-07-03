@@ -25,35 +25,36 @@ from pydantic import BaseModel, field_validator
 # Reference data schemas — populate mobile app dropdowns
 # ═══════════════════════════════════════════════════════════════════════════════
 
+
 class SubCategoryOut(BaseModel):
-    id:          int
+    id: int
     category_id: int
-    name_fr:     str
-    name_en:     str
-    slug:        str
+    name_fr: str
+    name_en: str
+    slug: str
 
     model_config = {"from_attributes": True}
 
 
 class CategoryOut(BaseModel):
-    id:              int
-    name_fr:         str
-    name_en:         str
-    slug:            str
-    icon_name:       str
-    sort_order:      int
-    sub_categories:  list[SubCategoryOut] = []
+    id: int
+    name_fr: str
+    name_en: str
+    slug: str
+    icon_name: str
+    sort_order: int
+    sub_categories: list[SubCategoryOut] = []
 
     model_config = {"from_attributes": True}
 
 
 class LocationNodeOut(BaseModel):
-    id:              int
-    name:            str
+    id: int
+    name: str
     display_name_fr: str
-    latitude:        float
-    longitude:       float
-    sort_order:      int
+    latitude: float
+    longitude: float
+    sort_order: int
 
     model_config = {"from_attributes": True}
 
@@ -62,13 +63,14 @@ class LocationNodeOut(BaseModel):
 # Request schemas
 # ═══════════════════════════════════════════════════════════════════════════════
 
+
 class ProviderRegisterIn(BaseModel):
-    full_name:          str
-    category_id:        int
-    sub_category_id:    int
-    location_node_id:   int
+    full_name: str
+    category_id: int
+    sub_category_id: int
+    location_node_id: int
     is_mobile_provider: bool = False
-    offers_delivery:    bool = False
+    offers_delivery: bool = False
 
     @field_validator("full_name")
     @classmethod
@@ -85,12 +87,13 @@ class ProviderRegisterIn(BaseModel):
 
 class ProviderUpdateIn(BaseModel):
     """Partial update — every field is optional."""
-    full_name:          Optional[str]  = None
-    category_id:        Optional[int]  = None
-    sub_category_id:    Optional[int]  = None
-    location_node_id:   Optional[int]  = None
+
+    full_name: Optional[str] = None
+    category_id: Optional[int] = None
+    sub_category_id: Optional[int] = None
+    location_node_id: Optional[int] = None
     is_mobile_provider: Optional[bool] = None
-    offers_delivery:    Optional[bool] = None
+    offers_delivery: Optional[bool] = None
 
     @field_validator("full_name")
     @classmethod
@@ -111,58 +114,62 @@ class ProviderUpdateIn(BaseModel):
 # Response schemas
 # ═══════════════════════════════════════════════════════════════════════════════
 
+
 class ProviderSummaryOut(BaseModel):
     """Condensed card for search results — light payload for 2G."""
-    id:                  uuid.UUID
-    full_name:           str
+
+    id: uuid.UUID
+    full_name: str
     # Flat IDs — used by mobile app to filter / verify results
-    category_id:         int
-    sub_category_id:     int
-    location_node_id:    int
-    is_mobile_provider:  bool
-    offers_delivery:     bool
-    id_card_verified:    bool
-    confirmed_tx_count:  int
-    thumbs_up_count:     int
-    thumbs_down_count:   int
-    satisfaction_rate:   Optional[float]
+    category_id: int
+    sub_category_id: int
+    location_node_id: int
+    is_mobile_provider: bool
+    offers_delivery: bool
+    id_card_verified: bool
+    confirmed_tx_count: int
+    thumbs_up_count: int
+    thumbs_down_count: int
+    satisfaction_rate: Optional[float]
     # Nested objects for display
-    category:            CategoryOut
-    sub_category:        SubCategoryOut
-    location_node:       LocationNodeOut
+    category: CategoryOut
+    sub_category: SubCategoryOut
+    location_node: LocationNodeOut
 
     model_config = {"from_attributes": True}
 
 
 class ProviderOut(BaseModel):
     """Full provider profile."""
-    id:                  uuid.UUID
-    user_id:             uuid.UUID
-    full_name:           str
-    category_id:         int
-    sub_category_id:     int
-    location_node_id:    int
-    is_mobile_provider:  bool
-    offers_delivery:     bool
-    is_active:           bool
-    id_card_verified:    bool
-    suspension_reason:   Optional[str]
-    confirmed_tx_count:  int
-    thumbs_up_count:     int
-    thumbs_down_count:   int
-    satisfaction_rate:   Optional[float]
-    created_at:          datetime
-    updated_at:          datetime
-    category:            CategoryOut
-    sub_category:        SubCategoryOut
-    location_node:       LocationNodeOut
+
+    id: uuid.UUID
+    user_id: uuid.UUID
+    full_name: str
+    category_id: int
+    sub_category_id: int
+    location_node_id: int
+    is_mobile_provider: bool
+    offers_delivery: bool
+    is_active: bool
+    id_card_verified: bool
+    suspension_reason: Optional[str]
+    confirmed_tx_count: int
+    thumbs_up_count: int
+    thumbs_down_count: int
+    satisfaction_rate: Optional[float]
+    created_at: datetime
+    updated_at: datetime
+    category: CategoryOut
+    sub_category: SubCategoryOut
+    location_node: LocationNodeOut
 
     model_config = {"from_attributes": True}
 
 
 class ProviderSearchOut(BaseModel):
     """Paginated search response."""
-    total:     int
-    page:      int
+
+    total: int
+    page: int
     page_size: int
-    results:   list[ProviderSummaryOut]
+    results: list[ProviderSummaryOut]

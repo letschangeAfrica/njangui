@@ -49,17 +49,25 @@ def register_provider(
     db: Session,
 ) -> ProviderProfile:
     # 1. No duplicate profiles
-    if db.query(ProviderProfile).filter(ProviderProfile.user_id == current_user.id).first():
+    if (
+        db.query(ProviderProfile)
+        .filter(ProviderProfile.user_id == current_user.id)
+        .first()
+    ):
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="Vous avez déjà un profil prestataire.",
         )
 
     # 2. Validate category
-    category = db.query(Category).filter(
-        Category.id == data.category_id,
-        Category.is_active == True,  # noqa: E712
-    ).first()
+    category = (
+        db.query(Category)
+        .filter(
+            Category.id == data.category_id,
+            Category.is_active == True,  # noqa: E712
+        )
+        .first()
+    )
     if not category:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -67,11 +75,15 @@ def register_provider(
         )
 
     # 3. Validate sub-category belongs to category
-    sub_category = db.query(SubCategory).filter(
-        SubCategory.id == data.sub_category_id,
-        SubCategory.category_id == data.category_id,
-        SubCategory.is_active == True,  # noqa: E712
-    ).first()
+    sub_category = (
+        db.query(SubCategory)
+        .filter(
+            SubCategory.id == data.sub_category_id,
+            SubCategory.category_id == data.category_id,
+            SubCategory.is_active == True,  # noqa: E712
+        )
+        .first()
+    )
     if not sub_category:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -82,10 +94,14 @@ def register_provider(
         )
 
     # 4. Validate location node
-    location_node = db.query(LocationNode).filter(
-        LocationNode.id == data.location_node_id,
-        LocationNode.is_active == True,  # noqa: E712
-    ).first()
+    location_node = (
+        db.query(LocationNode)
+        .filter(
+            LocationNode.id == data.location_node_id,
+            LocationNode.is_active == True,  # noqa: E712
+        )
+        .first()
+    )
     if not location_node:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -138,10 +154,14 @@ def update_provider(
     )
 
     if data.category_id is not None:
-        cat = db.query(Category).filter(
-            Category.id == data.category_id,
-            Category.is_active == True,  # noqa: E712
-        ).first()
+        cat = (
+            db.query(Category)
+            .filter(
+                Category.id == data.category_id,
+                Category.is_active == True,  # noqa: E712
+            )
+            .first()
+        )
         if not cat:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -149,11 +169,15 @@ def update_provider(
             )
 
     if data.sub_category_id is not None:
-        sub = db.query(SubCategory).filter(
-            SubCategory.id == data.sub_category_id,
-            SubCategory.category_id == effective_category_id,
-            SubCategory.is_active == True,  # noqa: E712
-        ).first()
+        sub = (
+            db.query(SubCategory)
+            .filter(
+                SubCategory.id == data.sub_category_id,
+                SubCategory.category_id == effective_category_id,
+                SubCategory.is_active == True,  # noqa: E712
+            )
+            .first()
+        )
         if not sub:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -164,10 +188,14 @@ def update_provider(
             )
 
     if data.location_node_id is not None:
-        loc = db.query(LocationNode).filter(
-            LocationNode.id == data.location_node_id,
-            LocationNode.is_active == True,  # noqa: E712
-        ).first()
+        loc = (
+            db.query(LocationNode)
+            .filter(
+                LocationNode.id == data.location_node_id,
+                LocationNode.is_active == True,  # noqa: E712
+            )
+            .first()
+        )
         if not loc:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,

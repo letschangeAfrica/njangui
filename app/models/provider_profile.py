@@ -1,12 +1,18 @@
 import uuid
 
 from datetime import datetime
+from typing import TYPE_CHECKING
 
 from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text, text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
+
+if TYPE_CHECKING:
+    from app.models.category import Category, SubCategory
+    from app.models.location_node import LocationNode
+    from app.models.user import User
 
 
 class ProviderProfile(Base):
@@ -20,6 +26,7 @@ class ProviderProfile(Base):
     application code. This avoids COUNT() queries on the hot search path, which is
     critical for performance on 2G connections.
     """
+
     __tablename__ = "provider_profiles"
 
     id: Mapped[uuid.UUID] = mapped_column(
@@ -31,7 +38,7 @@ class ProviderProfile(Base):
     user_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("users.id"),
-        unique=True,   # UNIQUE enforces one phone number = one provider profile
+        unique=True,  # UNIQUE enforces one phone number = one provider profile
         nullable=False,
         comment="One-to-one with Users. UNIQUE = one phone cannot have two provider profiles.",
     )
@@ -147,7 +154,9 @@ class ProviderProfile(Base):
 
     # ── Relationships ────────────────────────────────────────────────────────
     user: Mapped["User"] = relationship("User", back_populates="provider_profile")
-    category: Mapped["Category"] = relationship("Category", back_populates="provider_profiles")
+    category: Mapped["Category"] = relationship(
+        "Category", back_populates="provider_profiles"
+    )
     sub_category: Mapped["SubCategory"] = relationship(
         "SubCategory", back_populates="provider_profiles"
     )

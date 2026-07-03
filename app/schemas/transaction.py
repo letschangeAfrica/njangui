@@ -11,10 +11,12 @@ from pydantic import BaseModel, field_validator
 
 # ── Request schemas ───────────────────────────────────────────────────────────
 
+
 class TransactionCreateIn(BaseModel):
     """Customer initiates a transaction with a provider."""
+
     provider_id: uuid.UUID
-    amount_xaf:  int
+    amount_xaf: int
     description: Optional[str] = None
 
     @field_validator("amount_xaf")
@@ -36,8 +38,9 @@ class TransactionCreateIn(BaseModel):
 
 class RatingCreateIn(BaseModel):
     """Customer submits a rating after confirming a transaction."""
+
     thumbs_up: bool
-    comment:   Optional[str] = None
+    comment: Optional[str] = None
 
     @field_validator("comment")
     @classmethod
@@ -49,37 +52,38 @@ class RatingCreateIn(BaseModel):
 
 # ── Response schemas ──────────────────────────────────────────────────────────
 
+
 class RatingOut(BaseModel):
-    id:         uuid.UUID
-    thumbs_up:  bool
-    comment:    Optional[str]
+    id: uuid.UUID
+    thumbs_up: bool
+    comment: Optional[str]
     created_at: datetime
 
     model_config = {"from_attributes": True}
 
 
 class TransactionOut(BaseModel):
-    id:                    uuid.UUID
-    provider_id:           uuid.UUID
-    customer_id:           uuid.UUID
-    amount_xaf:            int
-    description:           Optional[str]
-    status:                str
-    initiated_by:          uuid.UUID
-    initiated_at:          datetime
-    expires_at:            datetime
+    id: uuid.UUID
+    provider_id: uuid.UUID
+    customer_id: uuid.UUID
+    amount_xaf: int
+    description: Optional[str]
+    status: str
+    initiated_by: uuid.UUID
+    initiated_at: datetime
+    expires_at: datetime
     provider_confirmed_at: Optional[datetime]
     customer_confirmed_at: Optional[datetime]
     # Denormalised display fields
-    provider_name:         str
-    customer_name:         Optional[str]
-    rating:                Optional[RatingOut]
+    provider_name: str
+    customer_name: Optional[str]
+    rating: Optional[RatingOut]
 
     model_config = {"from_attributes": True}
 
 
 class TransactionListOut(BaseModel):
-    total:     int
-    page:      int
+    total: int
+    page: int
     page_size: int
-    results:   list[TransactionOut]
+    results: list[TransactionOut]

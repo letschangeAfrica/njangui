@@ -2,12 +2,17 @@ import enum
 import uuid
 
 from datetime import datetime
+from typing import TYPE_CHECKING
 
 from sqlalchemy import DateTime, Enum as SAEnum, ForeignKey, Text, text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
+
+if TYPE_CHECKING:
+    from app.models.transaction import Transaction
+    from app.models.user import User
 
 
 class RatingValue(str, enum.Enum):
@@ -23,7 +28,8 @@ class RatingValue(str, enum.Enum):
     thumbs_up   → increments provider_profiles.thumbs_up_count (via DB trigger)
     thumbs_down → increments provider_profiles.thumbs_down_count (via DB trigger)
     """
-    thumbs_up   = "thumbs_up"
+
+    thumbs_up = "thumbs_up"
     thumbs_down = "thumbs_down"
 
 
@@ -39,6 +45,7 @@ class Rating(Base):
     The trigger that updates provider_profiles counters is defined in the
     Alembic migration — not here. SQLAlchemy models describe structure only.
     """
+
     __tablename__ = "ratings"
 
     id: Mapped[uuid.UUID] = mapped_column(
@@ -50,7 +57,7 @@ class Rating(Base):
     transaction_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("transactions.id"),
-        unique=True,   # UNIQUE = one rating per transaction, forever
+        unique=True,  # UNIQUE = one rating per transaction, forever
         nullable=False,
         comment="UNIQUE enforces one rating per transaction. Cannot be changed after submission.",
     )
@@ -82,7 +89,9 @@ class Rating(Base):
     )
 
     # ── Relationships ────────────────────────────────────────────────────────
-    transaction: Mapped["Transaction"] = relationship("Transaction", back_populates="rating")
+    transaction: Mapped["Transaction"] = relationship(
+        "Transaction", back_populates="rating"
+    )
     rater: Mapped["User"] = relationship("User", foreign_keys=[rated_by])
 
     @property

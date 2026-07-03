@@ -1,7 +1,13 @@
+from typing import TYPE_CHECKING
+
 from sqlalchemy import Boolean, Integer, Numeric, SmallInteger, String, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
+
+if TYPE_CHECKING:
+    from app.models.provider_profile import ProviderProfile
+    from app.models.transaction import Transaction
 
 
 class LocationNode(Base):
@@ -20,6 +26,7 @@ class LocationNode(Base):
     Elig-Edzoa · Essos · Nkoldongo · Mvog-Mbi
     Madagascar · Nkomkana · Etoa-Meki · Omnisports
     """
+
     __tablename__ = "location_nodes"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)

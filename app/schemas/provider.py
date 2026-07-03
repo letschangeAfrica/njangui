@@ -16,6 +16,7 @@ from pydantic import BaseModel, Field, model_validator
 # Nested / shared
 # ═══════════════════════════════════════════════════════════════════════════════
 
+
 class CategoryOut(BaseModel):
     id: int
     name_fr: str
@@ -50,11 +51,13 @@ class LocationNodeOut(BaseModel):
 # POST /providers/register — request
 # ═══════════════════════════════════════════════════════════════════════════════
 
+
 class ProviderRegisterIn(BaseModel):
     """
     Input for registering as a provider for the first time.
     The authenticated user's ID is taken from the JWT — not from this body.
     """
+
     full_name: str = Field(
         ...,
         min_length=2,
@@ -90,11 +93,13 @@ class ProviderRegisterIn(BaseModel):
 # PUT /providers/me — request (all fields optional)
 # ═══════════════════════════════════════════════════════════════════════════════
 
+
 class ProviderUpdateIn(BaseModel):
     """
     Partial update for an existing provider profile.
     Only provided fields are updated (PATCH semantics via model_dump(exclude_unset=True)).
     """
+
     full_name: Optional[str] = Field(
         None,
         min_length=2,
@@ -121,11 +126,13 @@ class ProviderUpdateIn(BaseModel):
 # Response — full profile (own profile or public profile)
 # ═══════════════════════════════════════════════════════════════════════════════
 
+
 class ProviderProfileOut(BaseModel):
     """
     Full provider profile. Returned after register, on GET /providers/me, and GET /providers/{id}.
     Includes nested category / sub-category / location objects to avoid extra round-trips.
     """
+
     id: uuid.UUID
     user_id: uuid.UUID
     full_name: str
@@ -139,7 +146,7 @@ class ProviderProfileOut(BaseModel):
     confirmed_tx_count: int
     thumbs_up_count: int
     thumbs_down_count: int
-    satisfaction_rate: Optional[float]   # None if no ratings yet
+    satisfaction_rate: Optional[float]  # None if no ratings yet
 
     # Nested lookups (avoids extra round-trips from the mobile client on 2G)
     category: CategoryOut
@@ -156,12 +163,14 @@ class ProviderProfileOut(BaseModel):
 # Response — lightweight card for search results list
 # ═══════════════════════════════════════════════════════════════════════════════
 
+
 class ProviderCardOut(BaseModel):
     """
     Compact representation used in search results.
     Omits timestamps and nested objects to keep payloads small on 2G.
     The client fetches the full ProviderProfileOut only when the user taps a card.
     """
+
     id: uuid.UUID
     full_name: str
     id_card_verified: bool
@@ -184,8 +193,9 @@ class ProviderCardOut(BaseModel):
 # Response — paginated search results
 # ═══════════════════════════════════════════════════════════════════════════════
 
+
 class ProviderSearchOut(BaseModel):
-    total: int              # total matching records (for pagination UI)
+    total: int  # total matching records (for pagination UI)
     page: int
     page_size: int
     results: list[ProviderCardOut]
@@ -194,6 +204,7 @@ class ProviderSearchOut(BaseModel):
 # ═══════════════════════════════════════════════════════════════════════════════
 # Response — reference data lists (used by the mobile app to populate dropdowns)
 # ═══════════════════════════════════════════════════════════════════════════════
+
 
 class CategoryWithSubsOut(BaseModel):
     id: int

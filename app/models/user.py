@@ -1,12 +1,18 @@
 import enum
 import uuid
 from datetime import datetime
+from typing import TYPE_CHECKING
 
-from sqlalchemy import Boolean, CheckConstraint, DateTime, Enum as SAEnum, SmallInteger, String, text
+from sqlalchemy import Boolean, DateTime, Enum as SAEnum, SmallInteger, String, text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
+
+if TYPE_CHECKING:
+    from app.models.fraud_flag import FraudFlag
+    from app.models.provider_profile import ProviderProfile
+    from app.models.transaction import Transaction
 
 
 class UserRole(str, enum.Enum):
@@ -16,6 +22,7 @@ class UserRole(str, enum.Enum):
     - provider : unlocked after provider profile registration is complete
     - both     : a user who has completed provider registration but also transacts as customer
     """
+
     customer = "customer"
     provider = "provider"
     both = "both"
@@ -29,6 +36,7 @@ class User(Base):
 
     UUID primary key prevents enumeration attacks (no sequential IDs exposed to the API).
     """
+
     __tablename__ = "users"
 
     id: Mapped[uuid.UUID] = mapped_column(

@@ -17,7 +17,6 @@ from typing import Optional
 from uuid import UUID
 
 from fastapi import HTTPException, status
-from sqlalchemy import and_
 from sqlalchemy.orm import Session, joinedload
 
 from app.models.category import Category, SubCategory
@@ -31,7 +30,10 @@ from app.schemas.provider import ProviderRegisterIn, ProviderUpdateIn
 # Step 1 — Register as a provider
 # ═══════════════════════════════════════════════════════════════════════════════
 
-def register_provider(data: ProviderRegisterIn, current_user: User, db: Session) -> ProviderProfile:
+
+def register_provider(
+    data: ProviderRegisterIn, current_user: User, db: Session
+) -> ProviderProfile:
     """
     Create a ProviderProfile for an authenticated user.
 
@@ -57,10 +59,14 @@ def register_provider(data: ProviderRegisterIn, current_user: User, db: Session)
         )
 
     # 2. Validate category exists and is active
-    category = db.query(Category).filter(
-        Category.id == data.category_id,
-        Category.is_active == True,  # noqa: E712
-    ).first()
+    category = (
+        db.query(Category)
+        .filter(
+            Category.id == data.category_id,
+            Category.is_active == True,  # noqa: E712
+        )
+        .first()
+    )
     if not category:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -68,11 +74,15 @@ def register_provider(data: ProviderRegisterIn, current_user: User, db: Session)
         )
 
     # 3. Validate sub-category is a child of the given category
-    sub_category = db.query(SubCategory).filter(
-        SubCategory.id == data.sub_category_id,
-        SubCategory.category_id == data.category_id,
-        SubCategory.is_active == True,  # noqa: E712
-    ).first()
+    sub_category = (
+        db.query(SubCategory)
+        .filter(
+            SubCategory.id == data.sub_category_id,
+            SubCategory.category_id == data.category_id,
+            SubCategory.is_active == True,  # noqa: E712
+        )
+        .first()
+    )
     if not sub_category:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -83,10 +93,14 @@ def register_provider(data: ProviderRegisterIn, current_user: User, db: Session)
         )
 
     # 4. Validate location node exists and is active
-    location_node = db.query(LocationNode).filter(
-        LocationNode.id == data.location_node_id,
-        LocationNode.is_active == True,  # noqa: E712
-    ).first()
+    location_node = (
+        db.query(LocationNode)
+        .filter(
+            LocationNode.id == data.location_node_id,
+            LocationNode.is_active == True,  # noqa: E712
+        )
+        .first()
+    )
     if not location_node:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -122,6 +136,7 @@ def register_provider(data: ProviderRegisterIn, current_user: User, db: Session)
 # Get a provider profile (public)
 # ═══════════════════════════════════════════════════════════════════════════════
 
+
 def get_provider_by_id(provider_id: UUID, db: Session) -> ProviderProfile:
     """
     Fetch a public provider profile by its UUID.
@@ -140,6 +155,7 @@ def get_provider_by_id(provider_id: UUID, db: Session) -> ProviderProfile:
 # ═══════════════════════════════════════════════════════════════════════════════
 # Get own profile (authenticated)
 # ═══════════════════════════════════════════════════════════════════════════════
+
 
 def get_my_provider_profile(current_user: User, db: Session) -> ProviderProfile:
     """
@@ -172,6 +188,7 @@ def get_my_provider_profile(current_user: User, db: Session) -> ProviderProfile:
 # Update own profile (authenticated)
 # ═══════════════════════════════════════════════════════════════════════════════
 
+
 def update_my_provider_profile(
     data: ProviderUpdateIn,
     current_user: User,
@@ -201,15 +218,19 @@ def update_my_provider_profile(
     updates = data.model_dump(exclude_unset=True)
 
     # Determine the effective category_id and sub_category_id after this update
-    effective_category_id    = updates.get("category_id",    profile.category_id)
+    effective_category_id = updates.get("category_id", profile.category_id)
     effective_sub_category_id = updates.get("sub_category_id", profile.sub_category_id)
 
     # Validate category if it changed
     if "category_id" in updates:
-        category = db.query(Category).filter(
-            Category.id == effective_category_id,
-            Category.is_active == True,  # noqa: E712
-        ).first()
+        category = (
+            db.query(Category)
+            .filter(
+                Category.id == effective_category_id,
+                Category.is_active == True,  # noqa: E712
+            )
+            .first()
+        )
         if not category:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -218,11 +239,15 @@ def update_my_provider_profile(
 
     # Validate sub-category relationship (always recheck if either ID changed)
     if "category_id" in updates or "sub_category_id" in updates:
-        sub_category = db.query(SubCategory).filter(
-            SubCategory.id == effective_sub_category_id,
-            SubCategory.category_id == effective_category_id,
-            SubCategory.is_active == True,  # noqa: E712
-        ).first()
+        sub_category = (
+            db.query(SubCategory)
+            .filter(
+                SubCategory.id == effective_sub_category_id,
+                SubCategory.category_id == effective_category_id,
+                SubCategory.is_active == True,  # noqa: E712
+            )
+            .first()
+        )
         if not sub_category:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -235,10 +260,14 @@ def update_my_provider_profile(
 
     # Validate location node if it changed
     if "location_node_id" in updates:
-        location_node = db.query(LocationNode).filter(
-            LocationNode.id == updates["location_node_id"],
-            LocationNode.is_active == True,  # noqa: E712
-        ).first()
+        location_node = (
+            db.query(LocationNode)
+            .filter(
+                LocationNode.id == updates["location_node_id"],
+                LocationNode.is_active == True,  # noqa: E712
+            )
+            .first()
+        )
         if not location_node:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -261,6 +290,7 @@ def update_my_provider_profile(
 # ═══════════════════════════════════════════════════════════════════════════════
 # Search providers
 # ═══════════════════════════════════════════════════════════════════════════════
+
 
 def search_providers(
     db: Session,
@@ -293,8 +323,8 @@ def search_providers(
       - page starts at 1
       - max page_size capped at 50 to protect against scraping
     """
-    page_size = min(page_size, 50)   # hard cap — prevent abuse
-    offset    = (page - 1) * page_size
+    page_size = min(page_size, 50)  # hard cap — prevent abuse
+    offset = (page - 1) * page_size
 
     # Base query — only active profiles
     query = (
@@ -324,11 +354,10 @@ def search_providers(
 
     # Apply ranking and pagination
     results = (
-        query
-        .order_by(
+        query.order_by(
             ProviderProfile.confirmed_tx_count.desc(),
             ProviderProfile.thumbs_up_count.desc(),
-            ProviderProfile.created_at.asc(),   # tie-breaker: earlier registration first
+            ProviderProfile.created_at.asc(),  # tie-breaker: earlier registration first
         )
         .offset(offset)
         .limit(page_size)
@@ -336,16 +365,17 @@ def search_providers(
     )
 
     return {
-        "total":     total,
-        "page":      page,
+        "total": total,
+        "page": page,
         "page_size": page_size,
-        "results":   results,
+        "results": results,
     }
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # Reference data (used by mobile client to populate dropdowns)
 # ═══════════════════════════════════════════════════════════════════════════════
+
 
 def get_categories(db: Session) -> list[Category]:
     """Return all active categories with their sub-categories, ordered by sort_order."""
@@ -372,7 +402,10 @@ def get_location_nodes(db: Session) -> list[LocationNode]:
 # Internal helpers
 # ═══════════════════════════════════════════════════════════════════════════════
 
-def _load_profile_with_relations(profile_id: UUID, db: Session) -> Optional[ProviderProfile]:
+
+def _load_profile_with_relations(
+    profile_id: UUID, db: Session
+) -> Optional[ProviderProfile]:
     """
     Load a profile with all relationships eager-loaded.
     This avoids N+1 queries when the response schema accesses .category, etc.

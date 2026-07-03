@@ -1,4 +1,4 @@
-﻿"""
+"""
 Security utilities for Njangui.
 
 What lives here:
@@ -42,6 +42,7 @@ bearer_scheme = HTTPBearer()
 # PIN utilities
 # ═══════════════════════════════════════════════════════════════════════════════
 
+
 def hash_pin(pin: str) -> str:
     """
     Hash a 4-digit PIN with bcrypt (cost factor 12).
@@ -63,6 +64,7 @@ def verify_pin(plain_pin: str, hashed_pin: str) -> bool:
 # ═══════════════════════════════════════════════════════════════════════════════
 # OTP utilities
 # ═══════════════════════════════════════════════════════════════════════════════
+
 
 def generate_otp() -> str:
     """
@@ -93,6 +95,7 @@ def verify_otp(plain_otp: str, hashed_otp: str) -> bool:
 # JWT utilities
 # ═══════════════════════════════════════════════════════════════════════════════
 
+
 def create_access_token(user_id: str, phone_number: str, role: str) -> str:
     """
     Create a signed JWT token for an authenticated user.
@@ -109,10 +112,10 @@ def create_access_token(user_id: str, phone_number: str, role: str) -> str:
         minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES
     )
     payload = {
-        "sub":   user_id,
+        "sub": user_id,
         "phone": phone_number,
-        "role":  role,
-        "exp":   expire,
+        "role": role,
+        "exp": expire,
     }
     return jwt.encode(payload, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
 
@@ -141,6 +144,7 @@ def decode_access_token(token: str) -> dict:
 # ═══════════════════════════════════════════════════════════════════════════════
 # FastAPI dependency: get_current_user
 # ═══════════════════════════════════════════════════════════════════════════════
+
 
 def get_current_user(
     credentials: HTTPAuthorizationCredentials = Depends(bearer_scheme),
@@ -203,6 +207,7 @@ def get_current_verified_provider(
     Used on provider-only endpoints (e.g. editing provider profile).
     """
     from app.models.user import UserRole
+
     if current_user.role == UserRole.customer:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,

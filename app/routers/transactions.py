@@ -59,8 +59,10 @@ def initiate_transaction(
     description="Returns all transactions where the authenticated user is provider or customer.",
 )
 def list_transactions(
-    status: Optional[str] = Query(None, description="Filter: pending | confirmed | expired | disputed"),
-    page:      int = Query(1,  ge=1),
+    status: Optional[str] = Query(
+        None, description="Filter: pending | confirmed | expired | disputed"
+    ),
+    page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=50),
     current_user=Depends(get_current_user),
     db: Session = Depends(get_db),

@@ -13,7 +13,6 @@ Coverage:
 
 import uuid
 import pytest
-from datetime import datetime, timezone
 
 from app.models.category import Category, SubCategory
 from app.models.location_node import LocationNode
@@ -21,7 +20,7 @@ from app.models.provider_profile import ProviderProfile
 from app.models.user import User, UserRole
 from app.core.security import hash_pin
 
-from tests.conftest import PHONE_NUMBER, PHONE_NUMBER2, VALID_PIN
+from tests.conftest import PHONE_NUMBER2, VALID_PIN
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -29,10 +28,11 @@ from tests.conftest import PHONE_NUMBER, PHONE_NUMBER2, VALID_PIN
 # (The Alembic migration seeds real data, but we access it here via fixtures.)
 # ═══════════════════════════════════════════════════════════════════════════════
 
+
 @pytest.fixture()
 def first_category(db) -> Category:
     """Return the first active category seeded by the migration."""
-    return db.query(Category).filter(Category.is_active == True).order_by(Category.id).first()
+    return db.query(Category).filter(Category.is_active).order_by(Category.id).first()
 
 
 @pytest.fixture()
@@ -42,7 +42,7 @@ def first_sub_category(db, first_category) -> SubCategory:
         db.query(SubCategory)
         .filter(
             SubCategory.category_id == first_category.id,
-            SubCategory.is_active == True,
+            SubCategory.is_active,
         )
         .order_by(SubCategory.id)
         .first()
@@ -54,7 +54,7 @@ def second_category(db, first_category) -> Category:
     """Return a different active category from first_category."""
     return (
         db.query(Category)
-        .filter(Category.is_active == True, Category.id != first_category.id)
+        .filter(Category.is_active, Category.id != first_category.id)
         .order_by(Category.id)
         .first()
     )
@@ -63,11 +63,18 @@ def second_category(db, first_category) -> Category:
 @pytest.fixture()
 def first_location(db) -> LocationNode:
     """Return the first active location node seeded by the migration."""
-    return db.query(LocationNode).filter(LocationNode.is_active == True).order_by(LocationNode.id).first()
+    return (
+        db.query(LocationNode)
+        .filter(LocationNode.is_active)
+        .order_by(LocationNode.id)
+        .first()
+    )
 
 
 @pytest.fixture()
-def provider_profile(db, existing_user, first_category, first_sub_category, first_location) -> ProviderProfile:
+def provider_profile(
+    db, existing_user, first_category, first_sub_category, first_location
+) -> ProviderProfile:
     """A ProviderProfile already attached to existing_user."""
     profile = ProviderProfile(
         user_id=existing_user.id,
@@ -106,8 +113,8 @@ def second_user(db) -> User:
 # GET /providers/categories
 # ═══════════════════════════════════════════════════════════════════════════════
 
-class TestListCategories:
 
+class TestListCategories:
     @pytest.mark.providers
     def test_list_categories_returns_all_active(self, client):
         """Should return all 8 seeded active categories with their sub-categories."""
@@ -134,8 +141,8 @@ class TestListCategories:
 # GET /providers/locations
 # ═══════════════════════════════════════════════════════════════════════════════
 
-class TestListLocations:
 
+class TestListLocations:
     @pytest.mark.providers
     def test_list_locations_returns_all_nodes(self, client):
         """Should return all 16 seeded Yaoundé location nodes."""
@@ -161,22 +168,31 @@ class TestListLocations:
 # POST /providers/register
 # ═══════════════════════════════════════════════════════════════════════════════
 
-class TestRegisterProvider:
 
+class TestRegisterProvider:
     @pytest.mark.providers
     def test_register_happy_path(
-        self, client, existing_user, auth_headers,
-        first_category, first_sub_category, first_location,
+        self,
+        client,
+        existing_user,
+        auth_headers,
+        first_category,
+        first_sub_category,
+        first_location,
     ):
         """Full registration flow — creates profile and upgrades user role."""
-        response = client.post("/providers/register", json={
-            "full_name":        "Marie Nguemo",
-            "category_id":      first_category.id,
-            "sub_category_id":  first_sub_category.id,
-            "location_node_id": first_location.id,
-            "is_mobile_provider": False,
-            "offers_delivery":    False,
-        }, headers=auth_headers)
+        response = client.post(
+            "/providers/register",
+            json={
+                "full_name": "Marie Nguemo",
+                "category_id": first_category.id,
+                "sub_category_id": first_sub_category.id,
+                "location_node_id": first_location.id,
+                "is_mobile_provider": False,
+                "offers_delivery": False,
+            },
+            headers=auth_headers,
+        )
 
         assert response.status_code == 201
         data = response.json()
@@ -191,63 +207,101 @@ class TestRegisterProvider:
 
     @pytest.mark.providers
     def test_register_updates_user_role(
-        self, client, db, existing_user, auth_headers,
-        first_category, first_sub_category, first_location,
+        self,
+        client,
+        db,
+        existing_user,
+        auth_headers,
+        first_category,
+        first_sub_category,
+        first_location,
     ):
         """After registration, user.role should be 'provider'."""
-        client.post("/providers/register", json={
-            "full_name":        "Marie Nguemo",
-            "category_id":      first_category.id,
-            "sub_category_id":  first_sub_category.id,
-            "location_node_id": first_location.id,
-        }, headers=auth_headers)
+        client.post(
+            "/providers/register",
+            json={
+                "full_name": "Marie Nguemo",
+                "category_id": first_category.id,
+                "sub_category_id": first_sub_category.id,
+                "location_node_id": first_location.id,
+            },
+            headers=auth_headers,
+        )
 
         db.refresh(existing_user)
         assert existing_user.role == UserRole.provider
 
     @pytest.mark.providers
-    def test_register_no_auth(self, client, first_category, first_sub_category, first_location):
+    def test_register_no_auth(
+        self, client, first_category, first_sub_category, first_location
+    ):
         """Unauthenticated request is rejected."""
-        response = client.post("/providers/register", json={
-            "full_name":        "Marie Nguemo",
-            "category_id":      first_category.id,
-            "sub_category_id":  first_sub_category.id,
-            "location_node_id": first_location.id,
-        })
+        response = client.post(
+            "/providers/register",
+            json={
+                "full_name": "Marie Nguemo",
+                "category_id": first_category.id,
+                "sub_category_id": first_sub_category.id,
+                "location_node_id": first_location.id,
+            },
+        )
         assert response.status_code == 403
 
     @pytest.mark.providers
     def test_register_duplicate_profile(
-        self, client, provider_profile, auth_headers,
-        first_category, first_sub_category, first_location,
+        self,
+        client,
+        provider_profile,
+        auth_headers,
+        first_category,
+        first_sub_category,
+        first_location,
     ):
         """Cannot register as provider twice for the same user."""
-        response = client.post("/providers/register", json={
-            "full_name":        "Duplicate",
-            "category_id":      first_category.id,
-            "sub_category_id":  first_sub_category.id,
-            "location_node_id": first_location.id,
-        }, headers=auth_headers)
+        response = client.post(
+            "/providers/register",
+            json={
+                "full_name": "Duplicate",
+                "category_id": first_category.id,
+                "sub_category_id": first_sub_category.id,
+                "location_node_id": first_location.id,
+            },
+            headers=auth_headers,
+        )
         assert response.status_code == 409
 
     @pytest.mark.providers
     def test_register_invalid_category(
-        self, client, existing_user, auth_headers,
-        first_sub_category, first_location,
+        self,
+        client,
+        existing_user,
+        auth_headers,
+        first_sub_category,
+        first_location,
     ):
         """Non-existent category_id is rejected."""
-        response = client.post("/providers/register", json={
-            "full_name":        "Test",
-            "category_id":      9999,
-            "sub_category_id":  first_sub_category.id,
-            "location_node_id": first_location.id,
-        }, headers=auth_headers)
+        response = client.post(
+            "/providers/register",
+            json={
+                "full_name": "Test",
+                "category_id": 9999,
+                "sub_category_id": first_sub_category.id,
+                "location_node_id": first_location.id,
+            },
+            headers=auth_headers,
+        )
         assert response.status_code == 400
 
     @pytest.mark.providers
     def test_register_wrong_subcategory_for_category(
-        self, client, existing_user, auth_headers, db,
-        first_category, second_category, first_location,
+        self,
+        client,
+        existing_user,
+        auth_headers,
+        db,
+        first_category,
+        second_category,
+        first_location,
     ):
         """Sub-category that doesn't belong to the given category_id is rejected."""
         # Get a sub-category that belongs to second_category, not first_category
@@ -255,44 +309,65 @@ class TestRegisterProvider:
             db.query(SubCategory)
             .filter(
                 SubCategory.category_id == second_category.id,
-                SubCategory.is_active == True,
+                SubCategory.is_active,
             )
             .first()
         )
-        response = client.post("/providers/register", json={
-            "full_name":        "Test",
-            "category_id":      first_category.id,
-            "sub_category_id":  wrong_sub.id,  # belongs to second_category
-            "location_node_id": first_location.id,
-        }, headers=auth_headers)
+        response = client.post(
+            "/providers/register",
+            json={
+                "full_name": "Test",
+                "category_id": first_category.id,
+                "sub_category_id": wrong_sub.id,  # belongs to second_category
+                "location_node_id": first_location.id,
+            },
+            headers=auth_headers,
+        )
         assert response.status_code == 400
 
     @pytest.mark.providers
     def test_register_invalid_location(
-        self, client, existing_user, auth_headers,
-        first_category, first_sub_category,
+        self,
+        client,
+        existing_user,
+        auth_headers,
+        first_category,
+        first_sub_category,
     ):
         """Non-existent location_node_id is rejected."""
-        response = client.post("/providers/register", json={
-            "full_name":        "Test",
-            "category_id":      first_category.id,
-            "sub_category_id":  first_sub_category.id,
-            "location_node_id": 9999,
-        }, headers=auth_headers)
+        response = client.post(
+            "/providers/register",
+            json={
+                "full_name": "Test",
+                "category_id": first_category.id,
+                "sub_category_id": first_sub_category.id,
+                "location_node_id": 9999,
+            },
+            headers=auth_headers,
+        )
         assert response.status_code == 400
 
     @pytest.mark.providers
     def test_register_full_name_trimmed(
-        self, client, existing_user, auth_headers,
-        first_category, first_sub_category, first_location,
+        self,
+        client,
+        existing_user,
+        auth_headers,
+        first_category,
+        first_sub_category,
+        first_location,
     ):
         """Leading/trailing whitespace is stripped from full_name."""
-        response = client.post("/providers/register", json={
-            "full_name":        "  Paul Biya  ",
-            "category_id":      first_category.id,
-            "sub_category_id":  first_sub_category.id,
-            "location_node_id": first_location.id,
-        }, headers=auth_headers)
+        response = client.post(
+            "/providers/register",
+            json={
+                "full_name": "  Paul Biya  ",
+                "category_id": first_category.id,
+                "sub_category_id": first_sub_category.id,
+                "location_node_id": first_location.id,
+            },
+            headers=auth_headers,
+        )
         assert response.status_code == 201
         assert response.json()["full_name"] == "Paul Biya"
 
@@ -301,8 +376,8 @@ class TestRegisterProvider:
 # GET /providers/me
 # ═══════════════════════════════════════════════════════════════════════════════
 
-class TestGetMyProfile:
 
+class TestGetMyProfile:
     @pytest.mark.providers
     def test_get_my_profile_exists(self, client, provider_profile, auth_headers):
         """Returns own profile when registered as provider."""
@@ -331,14 +406,18 @@ class TestGetMyProfile:
 # PUT /providers/me
 # ═══════════════════════════════════════════════════════════════════════════════
 
-class TestUpdateMyProfile:
 
+class TestUpdateMyProfile:
     @pytest.mark.providers
     def test_update_full_name(self, client, db, provider_profile, auth_headers):
         """Can update just the full_name without touching other fields."""
-        response = client.put("/providers/me", json={
-            "full_name": "Jean-Paul Kamdem",
-        }, headers=auth_headers)
+        response = client.put(
+            "/providers/me",
+            json={
+                "full_name": "Jean-Paul Kamdem",
+            },
+            headers=auth_headers,
+        )
         assert response.status_code == 200
         assert response.json()["full_name"] == "Jean-Paul Kamdem"
 
@@ -346,30 +425,42 @@ class TestUpdateMyProfile:
         assert provider_profile.full_name == "Jean-Paul Kamdem"
 
     @pytest.mark.providers
-    def test_update_location(self, client, db, provider_profile, auth_headers, first_location):
+    def test_update_location(
+        self, client, db, provider_profile, auth_headers, first_location
+    ):
         """Can update just the location_node_id."""
         # Get a different location node
         other_location = (
             db.query(LocationNode)
             .filter(
-                LocationNode.is_active == True,
+                LocationNode.is_active,
                 LocationNode.id != first_location.id,
             )
             .first()
         )
-        response = client.put("/providers/me", json={
-            "location_node_id": other_location.id,
-        }, headers=auth_headers)
+        response = client.put(
+            "/providers/me",
+            json={
+                "location_node_id": other_location.id,
+            },
+            headers=auth_headers,
+        )
         assert response.status_code == 200
         assert response.json()["location_node"]["id"] == other_location.id
 
     @pytest.mark.providers
-    def test_update_mobile_and_delivery_flags(self, client, provider_profile, auth_headers):
+    def test_update_mobile_and_delivery_flags(
+        self, client, provider_profile, auth_headers
+    ):
         """Can toggle mobility flags."""
-        response = client.put("/providers/me", json={
-            "is_mobile_provider": True,
-            "offers_delivery":    True,
-        }, headers=auth_headers)
+        response = client.put(
+            "/providers/me",
+            json={
+                "is_mobile_provider": True,
+                "offers_delivery": True,
+            },
+            headers=auth_headers,
+        )
         assert response.status_code == 200
         data = response.json()
         assert data["is_mobile_provider"] is True
@@ -377,22 +468,30 @@ class TestUpdateMyProfile:
 
     @pytest.mark.providers
     def test_update_category_and_subcategory_together(
-        self, client, provider_profile, auth_headers,
-        second_category, db,
+        self,
+        client,
+        provider_profile,
+        auth_headers,
+        second_category,
+        db,
     ):
         """Changing category requires providing a valid sub_category_id from the new category."""
         new_sub = (
             db.query(SubCategory)
             .filter(
                 SubCategory.category_id == second_category.id,
-                SubCategory.is_active == True,
+                SubCategory.is_active,
             )
             .first()
         )
-        response = client.put("/providers/me", json={
-            "category_id":     second_category.id,
-            "sub_category_id": new_sub.id,
-        }, headers=auth_headers)
+        response = client.put(
+            "/providers/me",
+            json={
+                "category_id": second_category.id,
+                "sub_category_id": new_sub.id,
+            },
+            headers=auth_headers,
+        )
         assert response.status_code == 200
         data = response.json()
         assert data["category"]["id"] == second_category.id
@@ -400,29 +499,40 @@ class TestUpdateMyProfile:
 
     @pytest.mark.providers
     def test_update_subcategory_wrong_category(
-        self, client, provider_profile, auth_headers,
-        second_category, db, first_category,
+        self,
+        client,
+        provider_profile,
+        auth_headers,
+        second_category,
+        db,
+        first_category,
     ):
         """Providing a sub-category that belongs to a different category is rejected."""
         wrong_sub = (
             db.query(SubCategory)
             .filter(
                 SubCategory.category_id == second_category.id,
-                SubCategory.is_active == True,
+                SubCategory.is_active,
             )
             .first()
         )
         # Try to set sub_category from second_category while keeping first_category
-        response = client.put("/providers/me", json={
-            "category_id":     first_category.id,
-            "sub_category_id": wrong_sub.id,
-        }, headers=auth_headers)
+        response = client.put(
+            "/providers/me",
+            json={
+                "category_id": first_category.id,
+                "sub_category_id": wrong_sub.id,
+            },
+            headers=auth_headers,
+        )
         assert response.status_code == 400
 
     @pytest.mark.providers
     def test_update_no_profile(self, client, existing_user, auth_headers):
         """Returns 404 if user has no provider profile."""
-        response = client.put("/providers/me", json={"full_name": "Test"}, headers=auth_headers)
+        response = client.put(
+            "/providers/me", json={"full_name": "Test"}, headers=auth_headers
+        )
         assert response.status_code == 404
 
     @pytest.mark.providers
@@ -436,8 +546,8 @@ class TestUpdateMyProfile:
 # GET /providers/{provider_id}
 # ═══════════════════════════════════════════════════════════════════════════════
 
-class TestGetProviderById:
 
+class TestGetProviderById:
     @pytest.mark.providers
     def test_get_provider_valid_id(self, client, provider_profile):
         """Returns full public profile for an active provider."""
@@ -483,8 +593,8 @@ class TestGetProviderById:
 # GET /providers (search)
 # ═══════════════════════════════════════════════════════════════════════════════
 
-class TestSearchProviders:
 
+class TestSearchProviders:
     @pytest.mark.providers
     def test_search_no_filters(self, client, provider_profile):
         """No filters returns all active providers (at least the seeded one)."""
@@ -516,7 +626,9 @@ class TestSearchProviders:
             assert result["category_id"] == first_category.id
 
     @pytest.mark.providers
-    def test_search_by_sub_category(self, client, provider_profile, first_category, first_sub_category):
+    def test_search_by_sub_category(
+        self, client, provider_profile, first_category, first_sub_category
+    ):
         """Filter by sub_category returns only providers with that exact specialty."""
         response = client.get(
             f"/providers?category_id={first_category.id}&sub_category_id={first_sub_category.id}"
@@ -560,7 +672,16 @@ class TestSearchProviders:
         assert str(provider_profile.id) not in ids
 
     @pytest.mark.providers
-    def test_search_pagination(self, client, db, existing_user, second_user, first_category, first_sub_category, first_location):
+    def test_search_pagination(
+        self,
+        client,
+        db,
+        existing_user,
+        second_user,
+        first_category,
+        first_sub_category,
+        first_location,
+    ):
         """Pagination: page 1 and page 2 with page_size=1 return different results."""
         # Create two providers
         for user in [existing_user, second_user]:

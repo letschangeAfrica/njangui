@@ -33,6 +33,7 @@ from app.routers import transactions as transactions_router
 # Lifespan — startup / shutdown logic
 # ═══════════════════════════════════════════════════════════════════════════════
 
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """
@@ -41,15 +42,17 @@ async def lifespan(app: FastAPI):
     Startup: log environment so it's obvious at a glance what mode we're in.
     Shutdown: nothing to close yet (SQLAlchemy pool disposes itself).
     """
-    env   = settings.ENVIRONMENT
+    env = settings.ENVIRONMENT
     debug = settings.DEBUG
-    print(f"\n{'='*55}")
+    print(f"\n{'=' * 55}")
     print(f"  {settings.APP_NAME} API — starting")
     print(f"  Environment : {env}")
     print(f"  Debug mode  : {debug}")
     if debug:
-        print("  WARNING: DEBUG=True — OTP codes visible in responses. Never use in production.")
-    print(f"{'='*55}\n")
+        print(
+            "  WARNING: DEBUG=True — OTP codes visible in responses. Never use in production."
+        )
+    print(f"{'=' * 55}\n")
     yield
     print(f"\n[{settings.APP_NAME}] shutting down.\n")
 
@@ -75,7 +78,7 @@ app = FastAPI(
     lifespan=lifespan,
     # In production, disable the interactive docs to reduce attack surface.
     # Set ENVIRONMENT=production to hide them.
-    docs_url="/docs"   if settings.ENVIRONMENT != "production" else None,
+    docs_url="/docs" if settings.ENVIRONMENT != "production" else None,
     redoc_url="/redoc" if settings.ENVIRONMENT != "production" else None,
 )
 
@@ -98,6 +101,7 @@ app.add_middleware(
 # ═══════════════════════════════════════════════════════════════════════════════
 # Exception handlers
 # ═══════════════════════════════════════════════════════════════════════════════
+
 
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(
@@ -159,6 +163,7 @@ app.include_router(
 # ═══════════════════════════════════════════════════════════════════════════════
 # Health check
 # ═══════════════════════════════════════════════════════════════════════════════
+
 
 @app.get(
     "/health",

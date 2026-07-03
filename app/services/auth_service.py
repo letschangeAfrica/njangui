@@ -1,4 +1,4 @@
-﻿"""
+"""
 Auth service — all authentication business logic lives here.
 
 Routers call these functions. Routers handle HTTP. Services handle logic.
@@ -32,15 +32,16 @@ from app.models.user import User, UserRole
 from app.schemas.auth import RegisterIn, LoginIn, OTPRequestedOut, TokenOut, UserOut
 
 # ── Constants ─────────────────────────────────────────────────────────────────
-OTP_EXPIRY_SECONDS       = 600     # 10 minutes
-OTP_RATE_LIMIT_PER_HOUR  = 3      # max OTP requests per phone per hour
-OTP_MAX_ATTEMPTS         = 5      # failed attempts before account lockout
-ACCOUNT_LOCKOUT_MINUTES  = 30     # lockout duration after OTP_MAX_ATTEMPTS failures
+OTP_EXPIRY_SECONDS = 600  # 10 minutes
+OTP_RATE_LIMIT_PER_HOUR = 3  # max OTP requests per phone per hour
+OTP_MAX_ATTEMPTS = 5  # failed attempts before account lockout
+ACCOUNT_LOCKOUT_MINUTES = 30  # lockout duration after OTP_MAX_ATTEMPTS failures
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # Step 1 — Request OTP
 # ═══════════════════════════════════════════════════════════════════════════════
+
 
 def request_otp(phone_number: str, db: Session, debug: bool = False) -> OTPRequestedOut:
     """
@@ -104,14 +105,15 @@ def _check_otp_rate_limit(phone_number: str, db: Session) -> None:
 
 def _log_otp_dev(phone_number: str, otp: str) -> None:
     """Development-only logger. Remove/disable in production."""
-    print(f"\n{'='*50}")
+    print(f"\n{'=' * 50}")
     print(f"[DEV] OTP for {phone_number}: {otp}")
-    print(f"{'='*50}\n")
+    print(f"{'=' * 50}\n")
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # Internal — Verify and consume an OTP
 # ═══════════════════════════════════════════════════════════════════════════════
+
 
 def _verify_and_consume_otp(phone_number: str, plain_otp: str, db: Session) -> None:
     """
@@ -131,8 +133,8 @@ def _verify_and_consume_otp(phone_number: str, plain_otp: str, db: Session) -> N
         db.query(OtpCode)
         .filter(
             OtpCode.phone_number == phone_number,
-            OtpCode.is_used      == False,          # noqa: E712
-            OtpCode.expires_at   >  now,
+            OtpCode.is_used == False,  # noqa: E712
+            OtpCode.expires_at > now,
         )
         .order_by(OtpCode.created_at.desc())
         .first()
@@ -179,6 +181,7 @@ def _verify_and_consume_otp(phone_number: str, plain_otp: str, db: Session) -> N
 # Step 2a — Register new user
 # ═══════════════════════════════════════════════════════════════════════════════
 
+
 def register_user(data: RegisterIn, db: Session) -> TokenOut:
     """
     Create a new user account.
@@ -213,7 +216,7 @@ def register_user(data: RegisterIn, db: Session) -> TokenOut:
         phone_number=data.phone_number,
         pin_hash=hash_pin(data.pin),
         role=UserRole.customer,
-        is_verified=True,     # OTP was just verified — account is verified at creation
+        is_verified=True,  # OTP was just verified — account is verified at creation
         language=data.language,
     )
     db.add(user)
@@ -237,6 +240,7 @@ def register_user(data: RegisterIn, db: Session) -> TokenOut:
 # Step 2b — Login existing user
 # ═══════════════════════════════════════════════════════════════════════════════
 
+
 def login_user(data: LoginIn, db: Session) -> TokenOut:
     """
     Authenticate an existing user.
@@ -259,10 +263,7 @@ def login_user(data: LoginIn, db: Session) -> TokenOut:
     if user is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=(
-                "Numéro non enregistré. "
-                "Créez un compte avec 'Inscription'."
-            ),
+            detail=("Numéro non enregistré. Créez un compte avec 'Inscription'."),
         )
 
     # 2. Check account status
@@ -296,9 +297,9 @@ def login_user(data: LoginIn, db: Session) -> TokenOut:
     _verify_and_consume_otp(data.phone_number, data.otp_code, db)
 
     # 5. Update last_login_at and reset lockout
-    user.last_login_at    = now
+    user.last_login_at = now
     user.otp_locked_until = None
-    user.otp_attempts     = 0
+    user.otp_attempts = 0
     db.commit()
     db.refresh(user)
 
@@ -318,6 +319,7 @@ def login_user(data: LoginIn, db: Session) -> TokenOut:
 # ═══════════════════════════════════════════════════════════════════════════════
 # Change PIN (authenticated action)
 # ═══════════════════════════════════════════════════════════════════════════════
+
 
 def change_pin(current_user: User, current_pin: str, new_pin: str, db: Session) -> None:
     """

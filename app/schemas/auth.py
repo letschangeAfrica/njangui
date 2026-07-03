@@ -13,7 +13,7 @@ import re
 import uuid
 from typing import Optional
 
-from pydantic import BaseModel, field_validator, model_validator
+from pydantic import BaseModel, field_validator
 
 
 # ── Shared validators ─────────────────────────────────────────────────────────
@@ -42,8 +42,21 @@ def validate_pin(pin: str) -> str:
     pin = pin.strip()
     if not pin.isdigit() or len(pin) != 4:
         raise ValueError("Le PIN doit contenir exactement 4 chiffres.")
-    blocked = {"1234", "0000", "1111", "2222", "3333", "4444",
-               "5555", "6666", "7777", "8888", "9999", "0123", "4321"}
+    blocked = {
+        "1234",
+        "0000",
+        "1111",
+        "2222",
+        "3333",
+        "4444",
+        "5555",
+        "6666",
+        "7777",
+        "8888",
+        "9999",
+        "0123",
+        "4321",
+    }
     if pin in blocked:
         raise ValueError("Ce PIN est trop simple. Choisissez un PIN plus sécurisé.")
     return pin
@@ -61,8 +74,10 @@ def validate_otp(otp: str) -> str:
 # Request schemas (incoming data from mobile app)
 # ═══════════════════════════════════════════════════════════════════════════════
 
+
 class RequestOTPIn(BaseModel):
     """Step 1 of both registration and login flows."""
+
     phone_number: str
 
     @field_validator("phone_number")
@@ -70,9 +85,7 @@ class RequestOTPIn(BaseModel):
     def phone_must_be_cameroonian(cls, v: str) -> str:
         return validate_cameroon_phone(v)
 
-    model_config = {"json_schema_extra": {
-        "example": {"phone_number": "+237612345678"}
-    }}
+    model_config = {"json_schema_extra": {"example": {"phone_number": "+237612345678"}}}
 
 
 class RegisterIn(BaseModel):
@@ -81,10 +94,11 @@ class RegisterIn(BaseModel):
     Combines OTP verification + PIN creation in one request
     to minimise round trips on 2G connections.
     """
+
     phone_number: str
-    otp_code:     str
-    pin:          str
-    language:     str = "fr"
+    otp_code: str
+    pin: str
+    language: str = "fr"
 
     @field_validator("phone_number")
     @classmethod
@@ -108,14 +122,16 @@ class RegisterIn(BaseModel):
             raise ValueError("Langue non supportée. Valeurs acceptées: 'fr', 'en'.")
         return v
 
-    model_config = {"json_schema_extra": {
-        "example": {
-            "phone_number": "+237612345678",
-            "otp_code":     "847291",
-            "pin":          "5923",
-            "language":     "fr",
+    model_config = {
+        "json_schema_extra": {
+            "example": {
+                "phone_number": "+237612345678",
+                "otp_code": "847291",
+                "pin": "5923",
+                "language": "fr",
+            }
         }
-    }}
+    }
 
 
 class LoginIn(BaseModel):
@@ -124,9 +140,10 @@ class LoginIn(BaseModel):
     OTP proves phone ownership. PIN proves identity.
     Both must be correct — neither alone is enough.
     """
+
     phone_number: str
-    otp_code:     str
-    pin:          str
+    otp_code: str
+    pin: str
 
     @field_validator("phone_number")
     @classmethod
@@ -146,19 +163,22 @@ class LoginIn(BaseModel):
             raise ValueError("Le PIN doit contenir exactement 4 chiffres.")
         return pin
 
-    model_config = {"json_schema_extra": {
-        "example": {
-            "phone_number": "+237612345678",
-            "otp_code":     "847291",
-            "pin":          "5923",
+    model_config = {
+        "json_schema_extra": {
+            "example": {
+                "phone_number": "+237612345678",
+                "otp_code": "847291",
+                "pin": "5923",
+            }
         }
-    }}
+    }
 
 
 class ChangePINIn(BaseModel):
     """Allows a logged-in user to change their PIN."""
+
     current_pin: str
-    new_pin:     str
+    new_pin: str
 
     @field_validator("current_pin")
     @classmethod
@@ -178,10 +198,12 @@ class ChangePINIn(BaseModel):
 # Response schemas (what the API sends back)
 # ═══════════════════════════════════════════════════════════════════════════════
 
+
 class OTPRequestedOut(BaseModel):
     """Returned after a successful OTP send."""
-    message:          str
-    expires_in:       int   # seconds until OTP expires (always 600 = 10 minutes)
+
+    message: str
+    expires_in: int  # seconds until OTP expires (always 600 = 10 minutes)
     # In development mode, the OTP is returned here for testing.
     # In production this field is NEVER populated.
     debug_otp: Optional[str] = None
@@ -189,36 +211,41 @@ class OTPRequestedOut(BaseModel):
 
 class UserOut(BaseModel):
     """Safe user representation — never exposes pin_hash or sensitive fields."""
-    id:           uuid.UUID
+
+    id: uuid.UUID
     phone_number: str
-    role:         str
-    is_verified:  bool
-    language:     str
+    role: str
+    is_verified: bool
+    language: str
 
     model_config = {"from_attributes": True}
 
 
 class TokenOut(BaseModel):
     """Returned after successful registration or login."""
-    access_token: str
-    token_type:   str = "bearer"
-    user:         UserOut
 
-    model_config = {"json_schema_extra": {
-        "example": {
-            "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
-            "token_type":   "bearer",
-            "user": {
-                "id":           "a1b2c3d4-...",
-                "phone_number": "+237612345678",
-                "role":         "customer",
-                "is_verified":  True,
-                "language":     "fr",
+    access_token: str
+    token_type: str = "bearer"
+    user: UserOut
+
+    model_config = {
+        "json_schema_extra": {
+            "example": {
+                "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+                "token_type": "bearer",
+                "user": {
+                    "id": "a1b2c3d4-...",
+                    "phone_number": "+237612345678",
+                    "role": "customer",
+                    "is_verified": True,
+                    "language": "fr",
+                },
             }
         }
-    }}
+    }
 
 
 class MessageOut(BaseModel):
     """Generic success message response."""
+
     message: str

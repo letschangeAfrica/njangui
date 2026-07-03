@@ -17,7 +17,6 @@ from fastapi import HTTPException, status
 from sqlalchemy import or_
 from sqlalchemy.orm import Session, joinedload
 
-from app.models.provider_profile import ProviderProfile
 from app.models.rating import Rating, RatingValue
 from app.models.transaction import Transaction, TransactionStatus
 from app.models.user import User
@@ -33,6 +32,7 @@ TRANSACTION_WINDOW_HOURS = 24
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
+
 
 def _to_out(tx: Transaction) -> TransactionOut:
     """Convert a Transaction ORM object to TransactionOut schema."""
@@ -96,6 +96,7 @@ def _load_tx(tx_id: uuid.UUID, db: Session) -> Transaction:
 
 # ── Initiate ──────────────────────────────────────────────────────────────────
 
+
 def initiate_transaction(
     data: TransactionCreateIn,
     current_user: User,
@@ -139,7 +140,7 @@ def initiate_transaction(
         description=data.description,
         initiated_by=current_user.id,
         initiated_at=now,
-        customer_confirmed_at=now,   # customer auto-confirms by initiating
+        customer_confirmed_at=now,  # customer auto-confirms by initiating
         expires_at=now + timedelta(hours=TRANSACTION_WINDOW_HOURS),
         status=TransactionStatus.pending,
     )
@@ -151,6 +152,7 @@ def initiate_transaction(
 
 
 # ── List ──────────────────────────────────────────────────────────────────────
+
 
 def list_transactions(
     current_user: User,
@@ -184,8 +186,7 @@ def list_transactions(
 
     total = query.count()
     txs = (
-        query
-        .order_by(Transaction.initiated_at.desc())
+        query.order_by(Transaction.initiated_at.desc())
         .offset((page - 1) * page_size)
         .limit(page_size)
         .all()
@@ -200,6 +201,7 @@ def list_transactions(
 
 
 # ── Get one ───────────────────────────────────────────────────────────────────
+
 
 def get_transaction(
     tx_id: uuid.UUID,
@@ -216,6 +218,7 @@ def get_transaction(
 
 
 # ── Confirm ───────────────────────────────────────────────────────────────────
+
 
 def confirm_transaction(
     tx_id: uuid.UUID,
@@ -273,6 +276,7 @@ def confirm_transaction(
 
 
 # ── Rate ──────────────────────────────────────────────────────────────────────
+
 
 def rate_transaction(
     tx_id: uuid.UUID,

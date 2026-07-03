@@ -62,7 +62,9 @@ def register_provider(
     current_user=Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    return providers_service.register_provider(data=body, current_user=current_user, db=db)
+    return providers_service.register_provider(
+        data=body, current_user=current_user, db=db
+    )
 
 
 # ── GET /providers/me ─────────────────────────────────────────────────────────
@@ -91,7 +93,9 @@ def update_my_profile(
     current_user=Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    return providers_service.update_provider(data=body, current_user=current_user, db=db)
+    return providers_service.update_provider(
+        data=body, current_user=current_user, db=db
+    )
 
 
 # ── GET /providers ────────────────────────────────────────────────────────────
@@ -102,13 +106,17 @@ def update_my_profile(
     summary="Search providers",
 )
 def search_providers(
-    location_node_id: Optional[int] = Query(None, description="Filter by neighbourhood ID"),
-    category_id:      Optional[int] = Query(None, description="Filter by category ID"),
-    sub_category_id:  Optional[int] = Query(None, description="Filter by sub-category ID"),
-    mobile_only:      bool          = Query(False, description="Only mobile providers"),
-    delivery_only:    bool          = Query(False, description="Only providers with delivery"),
-    page:             int           = Query(1,  ge=1),
-    page_size:        int           = Query(20, ge=1, le=50),
+    location_node_id: Optional[int] = Query(
+        None, description="Filter by neighbourhood ID"
+    ),
+    category_id: Optional[int] = Query(None, description="Filter by category ID"),
+    sub_category_id: Optional[int] = Query(
+        None, description="Filter by sub-category ID"
+    ),
+    mobile_only: bool = Query(False, description="Only mobile providers"),
+    delivery_only: bool = Query(False, description="Only providers with delivery"),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=50),
     db: Session = Depends(get_db),
 ):
     page_size = min(page_size, 50)  # hard cap even if validation is bypassed

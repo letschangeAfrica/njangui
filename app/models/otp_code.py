@@ -23,6 +23,7 @@ class OtpCode(Base):
     After 5 failed verification attempts on a single OTP code:
     → parent user account is locked (users.otp_locked_until = NOW() + 30 minutes)
     """
+
     __tablename__ = "otp_codes"
 
     __table_args__ = (

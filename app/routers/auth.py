@@ -44,7 +44,10 @@ router = APIRouter()
 )
 def check_exists(phone: str, db: Session = Depends(get_db)):
     from app.models.user import User as UserModel
-    exists = db.query(UserModel).filter(UserModel.phone_number == phone).first() is not None
+
+    exists = (
+        db.query(UserModel).filter(UserModel.phone_number == phone).first() is not None
+    )
     return {"exists": exists}
 
 

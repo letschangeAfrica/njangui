@@ -15,8 +15,15 @@ from sqlalchemy import (
 )
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
+from typing import TYPE_CHECKING
 
 from app.database import Base
+
+if TYPE_CHECKING:
+    from app.models.category import SubCategory
+    from app.models.location_node import LocationNode
+    from app.models.rating import Rating
+    from app.models.user import User
 
 
 class TransactionStatus(str, enum.Enum):
@@ -27,10 +34,11 @@ class TransactionStatus(str, enum.Enum):
     This immutability is what makes the reputation system trustworthy enough
     to form the basis of a credit identity.
     """
-    pending   = "pending"    # Initiated, waiting for both parties to confirm
+
+    pending = "pending"  # Initiated, waiting for both parties to confirm
     confirmed = "confirmed"  # Both confirmed within 24h — IMMUTABLE from this point
-    expired   = "expired"    # 24h window passed — set by Celery sweep every 15 minutes
-    disputed  = "disputed"   # Flagged for admin review
+    expired = "expired"  # 24h window passed — set by Celery sweep every 15 minutes
+    disputed = "disputed"  # Flagged for admin review
 
 
 class Transaction(Base):
@@ -48,6 +56,7 @@ class Transaction(Base):
     - Rule B: max 3 confirmed tx between same provider-customer pair per rolling 7 days
     - Self-transaction: CHECK (provider_id != customer_id) — cannot be bypassed
     """
+
     __tablename__ = "transactions"
 
     __table_args__ = (
@@ -159,9 +168,7 @@ class Transaction(Base):
     customer: Mapped["User"] = relationship(
         "User", foreign_keys=[customer_id], back_populates="transactions_as_customer"
     )
-    initiator: Mapped["User"] = relationship(
-        "User", foreign_keys=[initiated_by]
-    )
+    initiator: Mapped["User"] = relationship("User", foreign_keys=[initiated_by])
     sub_category: Mapped["SubCategory"] = relationship(
         "SubCategory", back_populates="transactions"
     )

@@ -1,4 +1,4 @@
-﻿"""
+"""
 Njangui — SQLAlchemy Models
 All 9 tables imported here so Alembic can discover them via Base.metadata.
 
@@ -12,14 +12,14 @@ Import order matters — respect foreign key dependencies:
   7. OtpCode (depends on users)
 """
 
-from app.models.category import Category, SubCategory          # noqa: F401
-from app.models.location_node import LocationNode              # noqa: F401
-from app.models.user import User, UserRole                     # noqa: F401
-from app.models.provider_profile import ProviderProfile        # noqa: F401
+from app.models.category import Category, SubCategory  # noqa: F401
+from app.models.location_node import LocationNode  # noqa: F401
+from app.models.user import User, UserRole  # noqa: F401
+from app.models.provider_profile import ProviderProfile  # noqa: F401
 from app.models.transaction import Transaction, TransactionStatus  # noqa: F401
-from app.models.rating import Rating, RatingValue              # noqa: F401
-from app.models.fraud_flag import FraudFlag, FraudFlagStatus   # noqa: F401
-from app.models.otp_code import OtpCode                        # noqa: F401
+from app.models.rating import Rating, RatingValue  # noqa: F401
+from app.models.fraud_flag import FraudFlag, FraudFlagStatus  # noqa: F401
+from app.models.otp_code import OtpCode  # noqa: F401
 
 __all__ = [
     "Category",

@@ -1,7 +1,21 @@
-from sqlalchemy import Boolean, ForeignKey, Integer, SmallInteger, String, UniqueConstraint, text
+from typing import TYPE_CHECKING
+
+from sqlalchemy import (
+    Boolean,
+    ForeignKey,
+    Integer,
+    SmallInteger,
+    String,
+    UniqueConstraint,
+    text,
+)
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
+
+if TYPE_CHECKING:
+    from app.models.provider_profile import ProviderProfile
+    from app.models.transaction import Transaction
 
 
 class Category(Base):
@@ -10,6 +24,7 @@ class Category(Base):
     Static reference data — seeded at database initialisation, never created by users.
     Uses SERIAL (integer) PK instead of UUID — simpler for static reference data.
     """
+
     __tablename__ = "categories"
 
     id: Mapped[int] = mapped_column(
@@ -82,6 +97,7 @@ class SubCategory(Base):
     Also seeded at initialisation. The category_id FK is the critical integrity constraint.
     Terminology uses the localized language of Yaoundé's markets — not corporate jargon.
     """
+
     __tablename__ = "sub_categories"
 
     __table_args__ = (
@@ -126,7 +142,9 @@ class SubCategory(Base):
     )
 
     # ── Relationships ────────────────────────────────────────────────────────
-    category: Mapped["Category"] = relationship("Category", back_populates="sub_categories")
+    category: Mapped["Category"] = relationship(
+        "Category", back_populates="sub_categories"
+    )
     provider_profiles: Mapped[list["ProviderProfile"]] = relationship(
         "ProviderProfile", back_populates="sub_category"
     )
