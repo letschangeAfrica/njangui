@@ -40,3 +40,7 @@ logs/
 .pytest_cache/
 .coverage
 htmlcov/
+
+# Node / Expo (mobile has its own node_modules under mobile/)
+node_modules/
+.expo/
