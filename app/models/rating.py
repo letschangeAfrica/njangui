@@ -3,7 +3,7 @@ import uuid
 
 from datetime import datetime
 
-from sqlalchemy import DateTime, Enum as SAEnum, ForeignKey, text
+from sqlalchemy import DateTime, Enum as SAEnum, ForeignKey, Text, text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -66,6 +66,12 @@ class Rating(Base):
         SAEnum(RatingValue, name="rating_value_enum", create_type=False),
         nullable=False,
         comment="Binary: thumbs_up increments thumbs_up_count, thumbs_down the opposite.",
+    )
+
+    comment: Mapped[str | None] = mapped_column(
+        Text,
+        nullable=True,
+        comment="Optional free-text comment from the customer.",
     )
 
     created_at: Mapped[datetime] = mapped_column(

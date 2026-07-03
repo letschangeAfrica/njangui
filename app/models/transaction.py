@@ -10,6 +10,7 @@ from sqlalchemy import (
     Enum as SAEnum,
     ForeignKey,
     Integer,
+    Text,
     text,
 )
 from sqlalchemy.dialects.postgresql import UUID
@@ -77,11 +78,17 @@ class Transaction(Base):
         comment="The customer party.",
     )
 
-    sub_category_id: Mapped[int] = mapped_column(
+    sub_category_id: Mapped[int | None] = mapped_column(
         Integer,
         ForeignKey("sub_categories.id"),
-        nullable=False,
-        comment="Service sub-category. Critical for price intelligence aggregation.",
+        nullable=True,
+        comment="Service sub-category. Nullable during MVP — description field used instead.",
+    )
+
+    description: Mapped[str | None] = mapped_column(
+        Text,
+        nullable=True,
+        comment="Free-text description of the service rendered.",
     )
 
     amount_xaf: Mapped[int] = mapped_column(

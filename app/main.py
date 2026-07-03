@@ -26,6 +26,7 @@ from fastapi.responses import JSONResponse
 from app.core.config import settings
 from app.routers import auth as auth_router
 from app.routers import providers as providers_router
+from app.routers import transactions as transactions_router
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -144,8 +145,13 @@ app.include_router(
     tags=["Providers"],
 )
 
+app.include_router(
+    transactions_router.router,
+    prefix="/transactions",
+    tags=["Transactions"],
+)
+
 # Phase 3 routers — added here as each module is built:
-# app.include_router(transactions_router.router, prefix="/transactions", tags=["Transactions"])
 # app.include_router(ratings_router.router, prefix="/ratings", tags=["Ratings"])
 # app.include_router(flags_router.router, prefix="/flags", tags=["Fraud Flags"])
 
