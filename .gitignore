@@ -44,3 +44,6 @@ htmlcov/
 # Node / Expo (mobile has its own node_modules under mobile/)
 node_modules/
 .expo/
+
+# Personal Claude Code standards — not shared with the team
+.claude/PERSONAL.md

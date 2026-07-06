@@ -19,6 +19,8 @@ export const C = {
   blueFaint: "#EEF2FD",   // blue tint — active state backgrounds
   terra:     "#C8782A",   // terracotta — warm accent, badges
   terraFaint:"#FEF3E8",   // terracotta tint
+  brandGreen:"#1E7A52",   // forest green — onboarding accent (logo, primary CTA)
+  brandGreenDeep:"#175F40", // darkened brandGreen — link text on light bg
 
   // Text
   ink:       "#1A1A2E",   // primary text

@@ -6,7 +6,7 @@
  */
 
 import { Ionicons } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import { useState } from "react";
 import {
   ActivityIndicator,
@@ -26,9 +26,19 @@ import { checkPhoneExists, sendOtp } from "../../services/auth";
 
 export default function PhoneScreen() {
   const router = useRouter();
+  const { intent } = useLocalSearchParams<{ intent?: string }>();
   const [phone, setPhone]     = useState("");
   const [focused, setFocused] = useState(false);
   const [loading, setLoading] = useState(false);
+
+  // `intent` is a UI hint carried from onboarding ("register" | "login") —
+  // it only changes the copy below. The actual new-vs-existing branching
+  // stays authoritative on the server via checkPhoneExists().
+  const title = intent === "login" ? "Connectez-vous" : "Votre numéro";
+  const subtitle =
+    intent === "login"
+      ? "Entrez votre numéro pour recevoir un code de connexion"
+      : "Nous vous enverrons un code de vérification par SMS";
 
   const isValid = phone.replace(/\s/g, "").length >= 8;
 
@@ -100,10 +110,8 @@ export default function PhoneScreen() {
             <View style={s.iconMark}>
               <Ionicons name="phone-portrait-outline" size={28} color={C.blue} />
             </View>
-            <Text style={s.title}>Votre numéro</Text>
-            <Text style={s.subtitle}>
-              Nous vous enverrons un code de vérification par SMS
-            </Text>
+            <Text style={s.title}>{title}</Text>
+            <Text style={s.subtitle}>{subtitle}</Text>
           </View>
 
           {/* Input card */}

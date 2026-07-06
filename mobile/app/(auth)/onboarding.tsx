@@ -5,188 +5,142 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import {
-  Dimensions,
   StyleSheet,
   Text,
   TouchableOpacity,
+  useWindowDimensions,
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import MarketIllustration from "../../components/illustrations/MarketIllustration";
 import { C, F } from "../../constants/theme";
+import { t } from "../../lib/i18n";
+import { track } from "../../services/analytics";
 
-const { width, height } = Dimensions.get("window");
-
-// ── Market illustration — pure geometry, no emojis ────────────────────────────
-function MarketIllustration() {
-  return (
-    <View style={ill.wrapper}>
-      {/* ground line */}
-      <View style={ill.ground} />
-
-      {/* left stall */}
-      <View style={ill.stallLeft}>
-        <View style={ill.roofLeft} />
-        <View style={ill.bodyLeft} />
-      </View>
-
-      {/* right stall */}
-      <View style={ill.stallRight}>
-        <View style={ill.roofRight} />
-        <View style={ill.bodyRight} />
-      </View>
-
-      {/* centre figure */}
-      <View style={ill.figureWrap}>
-        <View style={ill.figureHead} />
-        <View style={ill.figureBody} />
-      </View>
-
-      {/* handshake arc */}
-      <View style={ill.arc} />
-
-      {/* reputation badge */}
-      <View style={ill.badge}>
-        <Ionicons name="star" size={14} color={C.white} />
-      </View>
-    </View>
-  );
-}
-
-const ill = StyleSheet.create({
-  wrapper: {
-    width: width * 0.72,
-    height: height * 0.28,
-    alignItems: "center",
-    justifyContent: "flex-end",
-  },
-  ground: {
-    position: "absolute", bottom: 0, width: "100%",
-    height: 5, backgroundColor: "rgba(200,120,42,0.4)", borderRadius: 3,
-  },
-  stallLeft: {
-    position: "absolute", left: width * 0.02, bottom: 5,
-    width: width * 0.22, alignItems: "center",
-  },
-  roofLeft: {
-    width: 0, height: 0,
-    borderLeftWidth: width * 0.13, borderRightWidth: width * 0.13,
-    borderBottomWidth: 28,
-    borderLeftColor: "transparent", borderRightColor: "transparent",
-    borderBottomColor: C.terra,
-  },
-  bodyLeft: {
-    width: width * 0.2, height: 50,
-    backgroundColor: "rgba(200,120,42,0.25)", borderRadius: 4,
-  },
-  stallRight: {
-    position: "absolute", right: width * 0.02, bottom: 5,
-    width: width * 0.22, alignItems: "center",
-  },
-  roofRight: {
-    width: 0, height: 0,
-    borderLeftWidth: width * 0.13, borderRightWidth: width * 0.13,
-    borderBottomWidth: 28,
-    borderLeftColor: "transparent", borderRightColor: "transparent",
-    borderBottomColor: "#E09A40",
-  },
-  bodyRight: {
-    width: width * 0.2, height: 50,
-    backgroundColor: "rgba(224,154,64,0.2)", borderRadius: 4,
-  },
-  figureWrap: {
-    position: "absolute", bottom: 5, alignItems: "center",
-  },
-  figureHead: {
-    width: 28, height: 28, borderRadius: 14,
-    backgroundColor: "rgba(255,255,255,0.85)",
-  },
-  figureBody: {
-    width: 22, height: 44, borderRadius: 8,
-    backgroundColor: "rgba(255,255,255,0.55)", marginTop: 2,
-  },
-  arc: {
-    position: "absolute", bottom: 58,
-    width: 100, height: 50, borderRadius: 50,
-    borderWidth: 2.5, borderColor: "rgba(224,154,64,0.45)",
-    borderBottomColor: "transparent",
-  },
-  badge: {
-    position: "absolute", top: 2, right: width * 0.06,
-    width: 34, height: 34, borderRadius: 10,
-    backgroundColor: C.terra,
-    alignItems: "center", justifyContent: "center",
-    shadowColor: "#000", shadowOpacity: 0.2, shadowRadius: 6, elevation: 5,
-  },
-});
-
-// ── Feature pill ──────────────────────────────────────────────────────────────
+// ── Feature card ──────────────────────────────────────────────────────────────
 
 type IoniconsName = React.ComponentProps<typeof Ionicons>["name"];
 
-function FeaturePill({ icon, label }: { icon: IoniconsName; label: string }) {
+function FeatureCard({
+  icon,
+  iconColor,
+  iconBg,
+  label,
+}: {
+  icon: IoniconsName;
+  iconColor: string;
+  iconBg: string;
+  label: string;
+}) {
   return (
-    <View style={s.pill}>
-      <Ionicons name={icon} size={13} color={C.terra} />
-      <Text style={s.pillText}>{label}</Text>
+    <View style={s.card} accessible accessibilityLabel={label.replace("\n", " ")}>
+      <View style={[s.cardIcon, { backgroundColor: iconBg }]}>
+        <Ionicons name={icon} size={18} color={iconColor} />
+      </View>
+      <Text style={s.cardLabel}>{label}</Text>
     </View>
   );
 }
 
 // ── Screen ────────────────────────────────────────────────────────────────────
 
+// On web the app renders inside a fixed-width phone shell (app/_layout.tsx
+// caps it at 430px); on native, the window *is* the device. Clamping to
+// whichever is smaller keeps this sized to the visible frame either way —
+// measuring via onLayout was tried first but is unreliable here: on web,
+// a flex:1 container's onLayout can fire once before the flex layout
+// settles (reporting 0) and never fire again, leaving the illustration
+// permanently blank.
+const MAX_PHONE_WIDTH = 430;
+const SAFE_AREA_PADDING = 24 * 2;
+
 export default function OnboardingScreen() {
   const router = useRouter();
+  const { width: windowWidth } = useWindowDimensions();
+  const contentWidth = Math.min(windowWidth, MAX_PHONE_WIDTH) - SAFE_AREA_PADDING;
+
+  function goToPhone(intent: "register" | "login") {
+    track("onboarding_cta_tap", { intent });
+    router.push({ pathname: "/(auth)/phone", params: { intent } });
+  }
 
   return (
     <View style={s.root}>
-      {/* tinted top band */}
-      <View style={s.topBand} />
-
       <SafeAreaView style={s.safe}>
 
         {/* ── Brand ── */}
-        <View style={s.brand}>
-          {/* N lettermark */}
-          <View style={s.logoMark}>
+        <View style={s.brandRow}>
+          <View
+            style={s.logoMark}
+            accessibilityElementsHidden
+            importantForAccessibility="no-hide-descendants"
+          >
             <Text style={s.logoLetter}>N</Text>
           </View>
-          <Text style={s.wordmark}>NJANGUI</Text>
-          <View style={s.taglinePill}>
-            <Text style={s.taglineText}>La réputation qui ouvre les portes</Text>
-          </View>
+          <Text style={s.wordmark} accessibilityRole="header">NJANGUI</Text>
+        </View>
+
+        <View style={s.taglinePill}>
+          <View style={s.taglineDot} />
+          <Text style={s.taglineText}>{t("onboarding.tagline")}</Text>
         </View>
 
         {/* ── Illustration ── */}
-        <View style={s.illustrationArea}>
-          <MarketIllustration />
+        <View
+          style={s.illustrationArea}
+          accessible
+          accessibilityRole="image"
+          accessibilityLabel={t("onboarding.illustration.a11y")}
+        >
+          <MarketIllustration width={contentWidth * 0.92} accent={C.brandGreen} />
         </View>
 
-        {/* ── Feature pills ── */}
-        <View style={s.pillsRow}>
-          <FeaturePill icon="shield-checkmark-outline" label="Identité vérifiée" />
-          <FeaturePill icon="star-outline"             label="Réputation réelle" />
-          <FeaturePill icon="lock-closed-outline"      label="100 % sécurisé"   />
+        {/* ── Feature cards ── */}
+        <View style={s.cardsRow}>
+          <FeatureCard
+            icon="checkmark"
+            iconColor="#1E7A52"
+            iconBg="#E9F3EE"
+            label={t("onboarding.feature.verifiedIdentity")}
+          />
+          <FeatureCard
+            icon="star"
+            iconColor="#E0A21A"
+            iconBg="#FBF0DC"
+            label={t("onboarding.feature.realReputation")}
+          />
+          <FeatureCard
+            icon="shield-checkmark"
+            iconColor="#B84E0C"
+            iconBg="#FBE7D6"
+            label={t("onboarding.feature.secure")}
+          />
         </View>
 
         {/* ── CTA ── */}
         <View style={s.ctaArea}>
           <TouchableOpacity
             style={s.ctaBtn}
-            activeOpacity={0.82}
-            onPress={() => router.push("/(auth)/phone")}
+            activeOpacity={0.85}
+            onPress={() => goToPhone("register")}
+            accessibilityRole="button"
+            accessibilityLabel={t("onboarding.cta.start")}
+            accessibilityHint={t("onboarding.cta.startHint")}
           >
-            <Text style={s.ctaBtnText}>Commencer</Text>
-            <Ionicons name="arrow-forward" size={18} color={C.white} />
+            <Text style={s.ctaBtnText}>{t("onboarding.cta.start")}</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
             style={s.loginLink}
             activeOpacity={0.7}
-            onPress={() => router.push("/(auth)/phone")}
+            onPress={() => goToPhone("login")}
+            accessibilityRole="button"
+            accessibilityLabel={t("onboarding.cta.loginPrefix") + t("onboarding.cta.loginBold")}
+            accessibilityHint={t("onboarding.cta.loginHint")}
           >
             <Text style={s.loginLinkText}>
-              Déjà un compte ?{" "}
-              <Text style={s.loginLinkBold}>Se connecter</Text>
+              {t("onboarding.cta.loginPrefix")}
+              <Text style={s.loginLinkBold}>{t("onboarding.cta.loginBold")}</Text>
             </Text>
           </TouchableOpacity>
         </View>
@@ -197,86 +151,90 @@ export default function OnboardingScreen() {
 }
 
 const s = StyleSheet.create({
-  root: { flex: 1, backgroundColor: C.navy },
-  topBand: {
-    position: "absolute", top: 0, left: 0, right: 0,
-    height: height * 0.55,
-    backgroundColor: C.blue,
-    borderBottomLeftRadius: 48,
-    borderBottomRightRadius: 48,
-    opacity: 0.3,
-  },
+  root: { flex: 1, backgroundColor: C.pageBg },
   safe: {
-    flex: 1, paddingHorizontal: 24, paddingTop: 20,
+    flex: 1, paddingHorizontal: 24, paddingTop: 12,
     alignItems: "center", justifyContent: "space-between",
   },
 
   // Brand
-  brand: { alignItems: "center", marginTop: 16 },
+  brandRow: {
+    flexDirection: "row", alignItems: "center", gap: 12,
+    alignSelf: "flex-start", marginTop: 8,
+  },
   logoMark: {
-    width: 68, height: 68, borderRadius: 20,
-    backgroundColor: "rgba(255,255,255,0.12)",
-    borderWidth: 1.5, borderColor: "rgba(255,255,255,0.25)",
+    width: 46, height: 46, borderRadius: 14,
+    backgroundColor: C.brandGreen,
     alignItems: "center", justifyContent: "center",
-    marginBottom: 14,
+    shadowColor: C.brandGreen, shadowOpacity: 0.4,
+    shadowRadius: 9, shadowOffset: { width: 0, height: 4 }, elevation: 4,
   },
   logoLetter: {
-    fontFamily: F.bold, fontSize: 36,
-    color: C.white, letterSpacing: -1,
+    fontFamily: F.bold, fontSize: 24,
+    color: C.white,
   },
   wordmark: {
-    fontFamily: F.bold, fontSize: 32,
-    letterSpacing: 6, color: C.white, marginBottom: 12,
+    fontFamily: F.bold, fontSize: 26,
+    letterSpacing: 4, color: "#241C15",
   },
   taglinePill: {
-    backgroundColor: "rgba(200,120,42,0.25)",
-    borderWidth: 1, borderColor: "rgba(200,120,42,0.45)",
-    borderRadius: 20, paddingHorizontal: 16, paddingVertical: 6,
+    flexDirection: "row", alignItems: "center", gap: 8,
+    alignSelf: "flex-start", marginTop: 16,
+    backgroundColor: "#FBE7D6",
+    borderRadius: 20, paddingHorizontal: 16, paddingVertical: 8,
+  },
+  taglineDot: {
+    width: 6, height: 6, borderRadius: 3,
+    backgroundColor: "#B84E0C",
   },
   taglineText: {
-    fontFamily: F.medium, fontSize: 13,
-    color: C.pageBg, letterSpacing: 0.2,
+    fontFamily: F.semibold, fontSize: 13.5,
+    color: "#7A3A12",
   },
 
   illustrationArea: {
     alignItems: "center", justifyContent: "center", flex: 1,
   },
 
-  // Feature pills
-  pillsRow: { flexDirection: "row", gap: 8, marginBottom: 8 },
-  pill: {
-    flexDirection: "row", alignItems: "center", gap: 5,
-    backgroundColor: "rgba(255,255,255,0.09)",
-    borderRadius: 20, paddingHorizontal: 10, paddingVertical: 6,
+  // Feature cards
+  cardsRow: { flexDirection: "row", gap: 8, width: "100%", marginBottom: 22 },
+  card: {
+    flex: 1, alignItems: "center", gap: 8,
+    backgroundColor: C.cardBg, borderRadius: 16,
+    paddingVertical: 14, paddingHorizontal: 6,
+    borderWidth: 1, borderColor: "#EFE4D3",
   },
-  pillText: {
-    fontFamily: F.medium, fontSize: 11,
-    color: "rgba(255,255,255,0.82)",
+  cardIcon: {
+    width: 34, height: 34, borderRadius: 17,
+    alignItems: "center", justifyContent: "center",
+  },
+  cardLabel: {
+    fontFamily: F.semibold, fontSize: 11.5,
+    color: "#3A2E22", textAlign: "center", lineHeight: 14.5,
   },
 
   // CTA
   ctaArea: {
     width: "100%", alignItems: "center",
-    paddingBottom: 24, gap: 16,
+    paddingBottom: 12, gap: 16,
   },
   ctaBtn: {
     width: "100%", height: 56,
-    backgroundColor: C.terra, borderRadius: 16,
-    flexDirection: "row", alignItems: "center",
-    justifyContent: "center", gap: 8,
-    shadowColor: C.terra, shadowOpacity: 0.45,
-    shadowRadius: 12, elevation: 6,
+    backgroundColor: C.brandGreen, borderRadius: 16,
+    alignItems: "center", justifyContent: "center",
+    shadowColor: C.brandGreen, shadowOpacity: 0.45,
+    shadowRadius: 14, shadowOffset: { width: 0, height: 6 }, elevation: 6,
   },
   ctaBtnText: {
     fontFamily: F.bold, fontSize: 17,
     color: C.white, letterSpacing: 0.3,
   },
-  loginLink: { paddingVertical: 8 },
+  loginLink: { paddingVertical: 4 },
   loginLinkText: {
-    fontFamily: F.regular, fontSize: 14,
-    color: "rgba(255,255,255,0.6)",
+    fontFamily: F.regular, fontSize: 14.5,
+    color: "#6B5D4F",
   },
   loginLinkBold: {
-    fontFamily: F.semibold, color: "#E09A40",
+    fontFamily: F.bold, color: C.brandGreenDeep,
   },
 });
