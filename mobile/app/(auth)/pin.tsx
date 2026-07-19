@@ -1,7 +1,10 @@
 /**
  * Screens 4 & 5 — PIN creation (new users) / PIN entry (returning users)
  *
- * Receives { phone, otpCode } from the OTP screen.
+ * Pixel-matched to the approved design spec, same warm palette and shared
+ * NumericKeypad as phone.tsx/otp.tsx.
+ *
+ * Receives { phone, otpCode, isExisting } from the OTP screen.
  *
  * Flow:
  *   1. User enters a 4-digit PIN  →  step "create"
@@ -11,15 +14,29 @@
  *      If login also fails → show error, let them try again
  *
  * Special case — returning user:
- *   If register returns 409, we switch to "login" mode:
- *   the confirm step is replaced by a single "enter your existing PIN" prompt.
+ *   If register returns 409, we switch to "login" mode: the confirm step
+ *   is replaced by a single "enter your existing PIN" prompt.
+ *
+ * Deliberately NOT built (see plan for why):
+ *   - Biometric unlock: expo-local-authentication isn't used anywhere else
+ *     in this codebase yet — the original spec said only add it if it's
+ *     already wired in. Introducing a new native dependency + OS
+ *     permission flow is a separate decision.
+ *   - Personalized "Bon retour, {name}" greeting: the User model has no
+ *     name field, and this screen runs before the JWT exists, so there's
+ *     no profile to read one from yet.
+ *   - Local PIN storage: never stored client-side, by design — the
+ *     backend verifies it server-side on every login (verify_pin in
+ *     auth_service.py). Only the JWT is persisted, via AsyncStorage in
+ *     services/auth.ts, which is the correct place for a bearer token.
  */
 
 import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  Animated,
   Platform,
   StyleSheet,
   Text,
@@ -28,51 +45,83 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import NumericKeypad from "../../components/NumericKeypad";
 import { C, F } from "../../constants/theme";
+import { t } from "../../lib/i18n";
 import { ApiError } from "../../services/api";
 import { loginUser, registerUser } from "../../services/auth";
 
 const PIN_LENGTH = 4;
+const OTP_MAX_ATTEMPTS = 5; // must match app/services/auth_service.py OTP_MAX_ATTEMPTS
+const SHAKE_MS = 800;
+const TOAST_MS = 2400;
 
 // Must match backend validation in app/schemas/auth.py
 const BLOCKED_PINS = new Set([
-  "1234","0000","1111","2222","3333","4444",
-  "5555","6666","7777","8888","9999","0123","4321",
+  "1234", "0000", "1111", "2222", "3333", "4444",
+  "5555", "6666", "7777", "8888", "9999", "0123", "4321",
 ]);
 
 function validatePin(pin: string): string | null {
-  if (pin.length !== 4) return null; // not complete yet
-  if (BLOCKED_PINS.has(pin)) return "Ce PIN est trop simple. Choisissez un PIN plus sécurisé.";
+  if (pin.length !== PIN_LENGTH) return null; // not complete yet
+  if (BLOCKED_PINS.has(pin)) return t("pin.error.pinTooWeak");
   return null; // valid
 }
 
-const KEYS = [
-  ["1", "2", "3"],
-  ["4", "5", "6"],
-  ["7", "8", "9"],
-  ["", "0", "⌫"],
-];
+// Backend always phrases the lockout message as "...minute(s)." — parse
+// the count so the UI can show a live countdown instead of a static
+// sentence. Falls back to the raw message if the wording ever changes.
+function extractLockoutMinutes(message: string): number | null {
+  const match = /(\d+)\s*minute/.exec(message);
+  return match ? parseInt(match[1], 10) : null;
+}
 
 type Step = "create" | "confirm" | "login";
 
 export default function PinScreen() {
   const router = useRouter();
-  const params      = useLocalSearchParams<{ phone: string; otpCode: string; isExisting: string }>();
-  const phone       = params.phone   ?? "";
-  const otpCode     = params.otpCode ?? "";
-  const isExisting  = params.isExisting === "1";
+  const params = useLocalSearchParams<{ phone: string; otpCode: string; isExisting: string }>();
+  const phone = params.phone ?? "";
+  const otpCode = params.otpCode ?? "";
+  const isExisting = params.isExisting === "1";
 
-  const [step, setStep]       = useState<Step>(isExisting ? "login" : "create");
+  const [step, setStep] = useState<Step>(isExisting ? "login" : "create");
   const [created, setCreated] = useState("");
   const [current, setCurrent] = useState("");
-  const [error, setError]     = useState("");
-  const [shake, setShake]     = useState(false);
-  const [done, setDone]       = useState(false);
+  const [error, setError] = useState("");
+  const [done, setDone] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [attemptsLeft, setAttemptsLeft] = useState(OTP_MAX_ATTEMPTS);
+  const [lockSeconds, setLockSeconds] = useState(0); // 0 = not locked
+  const [lockMessage, setLockMessage] = useState(""); // raw backend text, shown when minutes can't be parsed
+  const [toast, setToast] = useState("");
+
+  const shakeX = useRef(new Animated.Value(0)).current;
+  const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const clearTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const locked = lockSeconds > 0 || !!lockMessage;
+  const accent = step === "login" ? C.terra : C.brandGreen;
+
+  // ── lockout countdown ─────────────────────────────────────────────────────
+  useEffect(() => {
+    if (lockSeconds <= 0) return;
+    const id = setInterval(() => {
+      setLockSeconds((s) => {
+        if (s <= 1) {
+          setAttemptsLeft(OTP_MAX_ATTEMPTS);
+          setError("");
+          return 0;
+        }
+        return s - 1;
+      });
+    }, 1000);
+    return () => clearInterval(id);
+  }, [lockSeconds > 0]);
 
   // ── auto-advance when 4 digits entered ───────────────────────────────────
   useEffect(() => {
-    if (current.length < PIN_LENGTH || loading) return;
+    if (current.length < PIN_LENGTH || loading || locked) return;
 
     if (step === "create") {
       const validationError = validatePin(current);
@@ -88,7 +137,9 @@ export default function PinScreen() {
 
     if (step === "confirm") {
       if (current !== created) {
-        triggerShake("Les codes PIN ne correspondent pas. Réessayez.");
+        triggerShake(t("pin.error.mismatch"));
+        setStep("create");
+        setCreated("");
         return;
       }
       submitAuth(current);
@@ -98,18 +149,48 @@ export default function PinScreen() {
     if (step === "login") {
       submitAuth(current);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [current]);
+
+  function shakeAnim() {
+    shakeX.setValue(0);
+    Animated.sequence([
+      Animated.timing(shakeX, { toValue: -8, duration: 60, useNativeDriver: true }),
+      Animated.timing(shakeX, { toValue: 8, duration: 60, useNativeDriver: true }),
+      Animated.timing(shakeX, { toValue: -5, duration: 60, useNativeDriver: true }),
+      Animated.timing(shakeX, { toValue: 5, duration: 60, useNativeDriver: true }),
+      Animated.timing(shakeX, { toValue: 0, duration: 60, useNativeDriver: true }),
+    ]).start();
+  }
 
   function triggerShake(msg: string) {
     if (Platform.OS !== "web") Vibration.vibrate(300);
-    setShake(true);
+    shakeAnim();
     setError(msg);
-    setTimeout(() => {
-      setShake(false);
+    if (clearTimer.current) clearTimeout(clearTimer.current);
+    clearTimer.current = setTimeout(() => {
       setCurrent("");
       setError("");
-    }, 800);
+    }, SHAKE_MS);
+  }
+
+  function flashToast(message: string) {
+    setToast(message);
+    if (toastTimer.current) clearTimeout(toastTimer.current);
+    toastTimer.current = setTimeout(() => setToast(""), TOAST_MS);
+  }
+
+  function enterLockout(message: string) {
+    const minutes = extractLockoutMinutes(message);
+    setCurrent("");
+    setError("");
+    if (minutes !== null) {
+      setLockSeconds(minutes * 60);
+      setLockMessage("");
+    } else {
+      setLockSeconds(0);
+      setLockMessage(message);
+    }
   }
 
   async function submitAuth(pin: string) {
@@ -122,9 +203,19 @@ export default function PinScreen() {
         await loginUser(phone, otpCode, pin);
         setDone(true);
         setTimeout(() => router.replace("/"), 700);
-      } catch (err: any) {
+      } catch (err) {
         setLoading(false);
-        const msg = err instanceof ApiError ? err.message : "Une erreur est survenue.";
+        if (err instanceof ApiError && err.status === 403) {
+          enterLockout(err.message);
+          return;
+        }
+        if (err instanceof ApiError && err.status === 401) {
+          const left = Math.max(0, attemptsLeft - 1);
+          setAttemptsLeft(left);
+          triggerShake(t("pin.error.wrongWithAttempts", { left: String(left) }));
+          return;
+        }
+        const msg = err instanceof ApiError ? err.message : t("pin.error.generic");
         triggerShake(msg);
       }
       return;
@@ -146,54 +237,65 @@ export default function PinScreen() {
         return;
       }
 
-      const msg = err instanceof ApiError ? err.message : "Une erreur est survenue.";
-
       if (err instanceof ApiError && err.status === 422) {
         // PIN validation failed (backend)
         setStep("create");
         setCreated("");
-        triggerShake(msg.replace(/^pin:\s*/i, ""));
+        triggerShake(err.message.replace(/^pin:\s*/i, ""));
         return;
       }
 
       // OTP expired, network error, account issue → show inline
+      const msg = err instanceof ApiError ? err.message : t("pin.error.generic");
       triggerShake(msg);
     }
   }
 
   function handleKey(key: string) {
-    if (done || loading) return;
-    if (key === "⌫") {
-      setCurrent((p) => p.slice(0, -1));
-      setError("");
-      return;
-    }
-    if (!key || current.length >= PIN_LENGTH) return;
-    setCurrent((p) => p + key);
+    if (done || loading || locked) return;
+    setCurrent((p) => (p.length < PIN_LENGTH ? p + key : p));
+    setError("");
+  }
+
+  function handleBackspace() {
+    if (done || loading || locked) return;
+    setCurrent((p) => p.slice(0, -1));
+    setError("");
+  }
+
+  function handleForgot() {
+    flashToast(t("pin.forgot.toast"));
+    setTimeout(() => router.replace("/(auth)/phone"), TOAST_MS);
   }
 
   // ── headings per step ─────────────────────────────────────────────────────
-  const heading =
-    step === "create"  ? "Créez votre code PIN" :
-    step === "confirm" ? "Confirmez votre code PIN" :
-                         "Entrez votre code PIN";
-  const subtext =
-    step === "create"  ? "Choisissez un code à 4 chiffres pour sécuriser votre compte" :
-    step === "confirm" ? "Saisissez à nouveau votre code PIN pour confirmer" :
-                         "Ce numéro est déjà enregistré. Entrez votre code PIN existant.";
+  const heading = t(
+    step === "create" ? "pin.title.create" : step === "confirm" ? "pin.title.confirm" : "pin.title.login",
+  );
+  const subtext = t(
+    step === "create"
+      ? "pin.subtitle.create"
+      : step === "confirm"
+        ? "pin.subtitle.confirm"
+        : "pin.subtitle.login",
+  );
+
+  const mm = Math.floor(lockSeconds / 60);
+  const ss = String(lockSeconds % 60).padStart(2, "0");
+  const countdown = `${mm}:${ss}`;
 
   // ── Done screen ───────────────────────────────────────────────────────────
   if (done) {
     return (
       <SafeAreaView style={s.safe}>
         <View style={s.doneContainer}>
-          <View style={s.doneSquare}>
+          <View style={[s.doneSquare, { backgroundColor: "#1E7A52" }]}>
             <Ionicons name="checkmark" size={40} color={C.white} />
           </View>
           <Text style={s.doneTitle}>
-            {step === "login" ? "Connexion réussie !" : "Compte créé !"}
+            {step === "login" ? t("pin.done.login") : t("pin.done.created")}
           </Text>
-          <ActivityIndicator color={C.navy} style={{ marginTop: 20 }} />
+          <ActivityIndicator color="#241C15" style={{ marginTop: 20 }} />
         </View>
       </SafeAreaView>
     );
@@ -201,195 +303,219 @@ export default function PinScreen() {
 
   return (
     <SafeAreaView style={s.safe}>
-      <View style={s.container}>
-
-        {/* Back — visible on create and login steps, hidden during confirm */}
-        {step !== "confirm" && (
+      {/* Back */}
+      {step !== "confirm" && (
+        <View style={s.backRow}>
           <TouchableOpacity
             style={s.back}
             onPress={() => router.back()}
             hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+            accessibilityRole="button"
+            accessibilityLabel={t("pin.back.a11y")}
           >
-            <Ionicons name="arrow-back" size={20} color={C.ink} />
+            <Ionicons name="arrow-back" size={22} color="#241C15" />
           </TouchableOpacity>
-        )}
+        </View>
+      )}
 
-        {/* Progress dots */}
-        <View style={s.progress}>
-          {[0, 1, 2].map((i) => (
-            <View key={i} style={[s.dot, i <= 2 && s.dotActive]} />
-          ))}
+      <View style={s.content}>
+        {/* Brand chip */}
+        <View style={s.brandRow}>
+          <View style={[s.brandMark, { backgroundColor: accent }]}>
+            <Text style={s.brandMarkLetter}>N</Text>
+          </View>
+          <Text style={s.brandWord}>NJANGUI</Text>
+        </View>
+
+        {/* Lock emblem */}
+        <View style={[s.emblem, { backgroundColor: accent }]}>
+          <Ionicons name="lock-closed-outline" size={28} color={C.white} />
         </View>
 
         {/* Header */}
-        <View style={s.header}>
-          <View style={[s.iconMark, step === "login" && s.iconMarkLogin]}>
-            <Ionicons
-              name={step === "login" ? "key-outline" : "lock-closed-outline"}
-              size={28}
-              color={step === "login" ? C.terra : C.blue}
-            />
-          </View>
-          <Text style={s.title}>{heading}</Text>
-          <Text style={[s.subtitle, step === "login" && { color: C.red }]}>
-            {subtext}
-          </Text>
-        </View>
+        <Text style={s.title}>{heading}</Text>
+        <Text style={s.subtitle}>{subtext}</Text>
 
-        {/* PIN dots */}
-        <View style={[s.dotsRow, shake && s.dotsShake]}>
-          {Array(PIN_LENGTH).fill(null).map((_, i) => (
-            <View
-              key={i}
-              style={[
-                s.pinDot,
-                i < current.length && s.pinDotFilled,
-                error && s.pinDotError,
-              ]}
-            />
-          ))}
-        </View>
-
-        {/* Error message */}
-        {!!error && <Text style={s.errorText}>{error}</Text>}
-
-        {/* Loading indicator */}
-        {loading && (
-          <ActivityIndicator color={C.navy} style={{ marginTop: 8 }} />
-        )}
-
-        {/* Keypad */}
-        <View style={s.keypad}>
-          {KEYS.map((row, ri) => (
-            <View key={ri} style={s.keyRow}>
-              {row.map((key, ki) => (
-                <TouchableOpacity
-                  key={ki}
-                  style={[s.key, !key && s.keyEmpty]}
-                  activeOpacity={key ? 0.7 : 1}
-                  onPress={() => handleKey(key)}
-                  disabled={!key || loading}
+        {/* PIN dots — masked ring style, not boxed OTP cells */}
+        <Animated.View
+          style={[s.dotsRow, { transform: [{ translateX: shakeX }] }]}
+          accessibilityLabel={t("pin.field.a11y")}
+        >
+          {Array(PIN_LENGTH)
+            .fill(null)
+            .map((_, i) => {
+              const filled = i < current.length;
+              let ringColor = "#EADFCD";
+              let ringBg = "#F5EEE2";
+              if (!!error) {
+                ringColor = "#E3B8B0";
+                ringBg = "#FCF3F1";
+              } else if (filled) {
+                ringColor = "#C9B896";
+                ringBg = C.white;
+              }
+              return (
+                <View
+                  key={i}
+                  style={[s.pinRing, { borderColor: ringColor, backgroundColor: ringBg }]}
+                  accessibilityLabel={t("pin.dot.a11y", {
+                    n: String(i + 1),
+                    state: filled ? t("pin.dot.filled") : "",
+                  })}
                 >
-                  {key === "⌫" ? (
-                    <Ionicons name="backspace-outline" size={24} color={C.dim} />
-                  ) : (
-                    <Text style={s.keyText}>{key}</Text>
+                  {filled && (
+                    <View
+                      style={[s.pinDot, { backgroundColor: error ? "#C0442E" : "#241C15" }]}
+                    />
                   )}
-                </TouchableOpacity>
-              ))}
-            </View>
-          ))}
+                </View>
+              );
+            })}
+        </Animated.View>
+
+        {/* Status line */}
+        <View style={s.statusArea} accessibilityLiveRegion="assertive">
+          {!!error && <Text style={s.errorText}>{error}</Text>}
+          {loading && <ActivityIndicator color="#241C15" style={{ marginTop: 4 }} />}
         </View>
 
-        {/* Restart / escape links */}
-        {step === "confirm" && (
-          <TouchableOpacity
-            style={s.goBack}
-            onPress={() => { setStep("create"); setCurrent(""); setError(""); }}
-          >
-            <Ionicons name="arrow-back" size={14} color={C.blue} />
-            <Text style={s.goBackText}>Recommencer</Text>
-          </TouchableOpacity>
-        )}
-        {step === "login" && (
-          <TouchableOpacity
-            style={s.goBack}
-            onPress={() => router.replace("/(auth)/phone")}
-          >
-            <Ionicons name="refresh-outline" size={14} color={C.blue} />
-            <Text style={s.goBackText}>Obtenir un nouveau code</Text>
-          </TouchableOpacity>
+        {/* Lockout card */}
+        {locked && (
+          <View style={s.lockCard} accessibilityLiveRegion="assertive">
+            <Text style={s.lockTitle}>{t("pin.locked.title")}</Text>
+            <Text style={s.lockBody}>
+              {lockMessage || t("pin.locked.body", { countdown })}
+            </Text>
+            <TouchableOpacity
+              style={s.lockCta}
+              onPress={() => router.replace("/(auth)/phone")}
+              accessibilityRole="button"
+              accessibilityLabel={t("pin.locked.cta")}
+            >
+              <Text style={s.lockCtaText}>{t("pin.locked.cta")}</Text>
+            </TouchableOpacity>
+          </View>
         )}
 
+        <View style={{ flex: 1 }} />
+
+        {/* Step indicator (create/confirm only) */}
+        {(step === "create" || step === "confirm") && (
+          <View style={s.stepRow}>
+            <View style={[s.stepDot, step === "create" && { backgroundColor: accent }]} />
+            <View style={[s.stepDot, step === "confirm" && { backgroundColor: accent }]} />
+            <Text style={s.stepLabel}>
+              {t("pin.step.label", { step: step === "create" ? "1" : "2" })}
+            </Text>
+          </View>
+        )}
+
+        {/* Forgot link (login mode) */}
+        {step === "login" && !locked && (
+          <TouchableOpacity
+            style={s.forgot}
+            onPress={handleForgot}
+            accessibilityRole="button"
+            accessibilityLabel={t("pin.forgot")}
+          >
+            <Text style={s.forgotText}>{t("pin.forgot")}</Text>
+          </TouchableOpacity>
+        )}
       </View>
+
+      <NumericKeypad onDigit={handleKey} onBackspace={handleBackspace} disabled={loading || locked} />
+
+      {!!toast && (
+        <View style={s.toast} pointerEvents="none">
+          <Text style={s.toastText}>{toast}</Text>
+        </View>
+      )}
     </SafeAreaView>
   );
 }
 
 const s = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: C.pageBg },
-  container: {
-    flex: 1, paddingHorizontal: 24,
-    paddingTop: 12, paddingBottom: 32,
-    alignItems: "center",
-  },
+  safe: { flex: 1, backgroundColor: "#FBF7F1" },
 
-  // Back
+  backRow: { paddingHorizontal: 20, paddingTop: 4 },
   back: {
-    alignSelf: "flex-start",
-    width: 44, height: 44, borderRadius: 22,
-    backgroundColor: C.cardBg,
-    borderWidth: 1, borderColor: C.border,
+    width: 44, height: 44, borderRadius: 12,
     alignItems: "center", justifyContent: "center",
-    marginBottom: 12,
   },
 
-  // Progress steps
-  progress: { flexDirection: "row", gap: 6, marginBottom: 28, justifyContent: "center" },
-  dot: { width: 8, height: 8, borderRadius: 4, backgroundColor: C.border },
-  dotActive: { backgroundColor: C.terra, width: 24 },
+  content: { flex: 1, paddingHorizontal: 28, paddingTop: 6, alignItems: "center" },
+
+  // Brand
+  brandRow: { flexDirection: "row", alignItems: "center", gap: 10, alignSelf: "flex-start", marginBottom: 8 },
+  brandMark: {
+    width: 34, height: 34, borderRadius: 10,
+    alignItems: "center", justifyContent: "center",
+  },
+  brandMarkLetter: { fontFamily: F.bold, fontSize: 19, color: C.white },
+  brandWord: { fontFamily: F.bold, fontSize: 17, letterSpacing: 2, color: "#241C15" },
+
+  // Lock emblem
+  emblem: {
+    width: 64, height: 64, borderRadius: 20, marginTop: 14, marginBottom: 16,
+    alignItems: "center", justifyContent: "center",
+  },
 
   // Header
-  header: { alignItems: "center", marginBottom: 36 },
-  iconMark: {
-    width: 72, height: 72, borderRadius: 20,
-    backgroundColor: C.blueFaint,
-    borderWidth: 1, borderColor: "rgba(27,79,216,0.15)",
-    alignItems: "center", justifyContent: "center", marginBottom: 16,
-  },
-  iconMarkLogin: {
-    backgroundColor: C.terraFaint,
-    borderColor: "rgba(200,120,42,0.2)",
-  },
   title: {
-    fontFamily: F.bold, fontSize: 24,
-    color: C.navy, marginBottom: 8, textAlign: "center",
+    fontFamily: F.bold, fontSize: 25,
+    color: "#241C15", marginBottom: 8, textAlign: "center",
   },
   subtitle: {
     fontFamily: F.regular, fontSize: 14,
-    color: C.dim, textAlign: "center", lineHeight: 20,
+    color: "#6B5D4F", textAlign: "center", lineHeight: 20, maxWidth: 290, marginBottom: 30,
   },
 
   // PIN dots
   dotsRow: { flexDirection: "row", gap: 16, marginBottom: 8 },
-  dotsShake: { transform: [{ translateX: 8 }] },
-  pinDot: {
-    width: 18, height: 18, borderRadius: 9,
-    borderWidth: 2, borderColor: C.border, backgroundColor: "transparent",
-  },
-  pinDotFilled: { backgroundColor: C.navy, borderColor: C.navy },
-  pinDotError: { borderColor: C.red },
-
-  errorText: {
-    fontFamily: F.regular, fontSize: 13,
-    color: C.red, marginBottom: 8, textAlign: "center",
-  },
-
-  // Keypad
-  keypad: { width: "100%", maxWidth: 300, marginTop: 32, gap: 12 },
-  keyRow: { flexDirection: "row", justifyContent: "space-between" },
-  key: {
-    width: 80, height: 72, borderRadius: 20,
-    backgroundColor: C.cardBg,
-    borderWidth: 1, borderColor: C.border,
+  pinRing: {
+    width: 52, height: 52, borderRadius: 26, borderWidth: 2,
     alignItems: "center", justifyContent: "center",
   },
-  keyEmpty: { backgroundColor: "transparent", borderColor: "transparent" },
-  keyText: { fontFamily: F.semibold, fontSize: 26, color: C.ink },
+  pinDot: { width: 14, height: 14, borderRadius: 7 },
 
-  // Restart
-  goBack: {
-    marginTop: 24, flexDirection: "row",
-    alignItems: "center", gap: 6,
+  statusArea: { minHeight: 24, marginTop: 18, alignItems: "center" },
+  errorText: { fontFamily: F.semibold, fontSize: 13, color: "#C0442E", textAlign: "center" },
+
+  // Lockout card
+  lockCard: {
+    marginTop: 10, backgroundColor: "#FCF3F1", borderWidth: 1, borderColor: "#E3B8B0",
+    borderRadius: 14, padding: 14, maxWidth: 300,
   },
-  goBackText: { fontFamily: F.medium, fontSize: 14, color: C.blue },
+  lockTitle: { fontFamily: F.bold, fontSize: 13, color: "#C0442E", marginBottom: 4 },
+  lockBody: { fontFamily: F.regular, fontSize: 12.5, lineHeight: 18, color: "#8A5A50" },
+  lockCta: {
+    marginTop: 10, alignSelf: "flex-start", backgroundColor: "#C0442E",
+    borderRadius: 999, paddingVertical: 8, paddingHorizontal: 16,
+  },
+  lockCtaText: { fontFamily: F.bold, fontSize: 12.5, color: C.white },
+
+  // Step indicator
+  stepRow: { flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 8 },
+  stepDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: "#DCCFB8" },
+  stepLabel: { fontFamily: F.semibold, fontSize: 12, color: "#9A8B79", marginLeft: 4 },
+
+  // Forgot
+  forgot: { marginBottom: 8, padding: 6 },
+  forgotText: { fontFamily: F.bold, fontSize: 13.5, color: C.brandGreenDeep },
 
   // Done screen
   doneContainer: { flex: 1, alignItems: "center", justifyContent: "center", gap: 16 },
   doneSquare: {
     width: 80, height: 80, borderRadius: 24,
-    backgroundColor: C.green,
     alignItems: "center", justifyContent: "center",
   },
-  doneTitle: { fontFamily: F.bold, fontSize: 22, color: C.navy },
+  doneTitle: { fontFamily: F.bold, fontSize: 22, color: "#241C15" },
+
+  // Toast
+  toast: {
+    position: "absolute", bottom: 120, alignSelf: "center",
+    backgroundColor: "#241C15", paddingVertical: 11, paddingHorizontal: 18,
+    borderRadius: 999,
+  },
+  toastText: { fontFamily: F.semibold, fontSize: 13, color: "#FBF7F1" },
 });
