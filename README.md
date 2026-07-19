@@ -2,6 +2,9 @@
 
 **Informal Economy Reputation Infrastructure for Cameroon**
 
+[![CI](https://github.com/letschangeAfrica/njangui/actions/workflows/ci.yml/badge.svg)](https://github.com/letschangeAfrica/njangui/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
 > A lightweight, offline-first portable professional identity layer for Cameroonian informal workers to turn real-world transactions into verified reputations.
 
 ---
@@ -37,11 +40,12 @@ Njangui/
 └── requirements.txt
 ```
 
-## Setup
+## Setup — Backend
 
 ```bash
 # 1. Clone and enter the project
-cd Njangui
+git clone https://github.com/letschangeAfrica/njangui.git
+cd njangui
 
 # 2. Create virtual environment
 python -m venv venv
@@ -61,11 +65,41 @@ alembic upgrade head
 uvicorn app.main:app --reload
 ```
 
+Or via Docker (spins up the API, PostgreSQL, and Redis together):
+
+```bash
+docker-compose up --build
+```
+
+## Setup — Mobile
+
+```bash
+cd mobile
+npm install
+npm start                # Expo dev server (scan the QR code, or press w for web)
+```
+
+Set `EXPO_PUBLIC_API_URL` in `mobile/.env` (or `.env.local`) to point at the
+backend above — restart the Expo dev server after changing it.
+
 ## Health Check
 
 ```
 GET /health → {"status": "ok", "app": "Njangui"}
 ```
+
+## Testing
+
+```bash
+venv\Scripts\python.exe -m pytest tests/ -v   # backend
+cd mobile && npm test                          # mobile
+```
+
+---
+
+## License
+
+MIT — see [LICENSE](LICENSE).
 
 ---
 

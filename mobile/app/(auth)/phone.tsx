@@ -245,7 +245,7 @@ export default function PhoneScreen() {
           onPress={handleSubmit}
           accessibilityRole="button"
           accessibilityLabel={t("phone.cta")}
-          accessibilityState={{ disabled: !isValid || loading }}
+          accessibilityState={{ disabled: loading }}
         >
           {loading ? (
             <ActivityIndicator color={C.white} />
